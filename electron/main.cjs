@@ -80,11 +80,19 @@ function setupUpdates() {
   try { ({ autoUpdater } = require("electron-updater")); } catch { return; }
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
+  // Everything the updater does is written to updater.log, so a problem can be seen instead of guessed.
+  const logFile = path.join(app.getPath("userData"), "updater.log");
+  const log = (lvl, m) => { try { fs.appendFileSync(logFile, `${new Date().toISOString()} ${lvl} ${String(m && m.stack || m)}\n`); } catch { /* ignore */ } };
+  try { if (fs.existsSync(logFile) && fs.statSync(logFile).size > 200000) fs.writeFileSync(logFile, ""); } catch { /* ignore */ }
+  autoUpdater.logger = { info: (m) => log("INFO", m), warn: (m) => log("WARN", m), error: (m) => log("ERROR", m), debug: () => {} };
+  log("INFO", `Noctua ${app.getVersion()} started; will check for updates`);
+  let manual = false;
+  const tell = (body) => { if (manual && Notification.isSupported()) new Notification({ title: "Noctua", body, icon: path.join(ROOT, "build", "icon.png") }).show(); };
   const set = (status, version) => { updateState = { status, version: version || updateState.version }; refreshTray(); };
   autoUpdater.on("checking-for-update", () => set("checking"));
-  autoUpdater.on("update-not-available", () => set("none"));
-  autoUpdater.on("update-available", (i) => set("downloading", i.version));
-  autoUpdater.on("error", () => set("error")); // offline or no release yet: stay quiet, try again later
+  autoUpdater.on("update-not-available", () => { set("none"); tell(T("نوكتوا محدّث، دي أحدث نسخة.", "Noctua is up to date.")); manual = false; });
+  autoUpdater.on("update-available", (i) => { set("downloading", i.version); tell(T(`لقيت نسخة جديدة ${i.version}، بنزّلها دلوقتي.`, `Found version ${i.version}, downloading it now.`)); });
+  autoUpdater.on("error", (e) => { updateState.error = String(e && e.message || e).slice(0, 200); set("error"); tell(T("تعذّر فحص التحديث: ", "Could not check for updates: ") + updateState.error); manual = false; });
   autoUpdater.on("update-downloaded", (i) => {
     set("ready", i.version);
     if (Notification.isSupported()) {
@@ -92,7 +100,7 @@ function setupUpdates() {
       n.on("click", installUpdate); n.show();
     }
   });
-  global.__check = () => autoUpdater.checkForUpdates().catch(() => set("error"));
+  global.__check = (byHand) => { manual = byHand === true; return autoUpdater.checkForUpdates().catch((e) => { log("ERROR", e); set("error"); }); };
   global.__install = () => { quitting = true; try { if (server) server.close(); } catch { /* ignore */ } autoUpdater.quitAndInstall(false, true); };
   setTimeout(global.__check, 15000);
   setInterval(global.__check, 6 * 3600 * 1000);
@@ -131,9 +139,11 @@ function makeTray() {
     if (st === "ready") return { label: T(`تثبيت التحديث ${v} وإعادة التشغيل`, `Install update ${v} and restart`), click: installUpdate };
     if (st === "downloading") return { label: T(`بنزّل التحديث ${v}…`, `Downloading update ${v}…`), enabled: false };
     if (st === "checking") return { label: T("بدوّر على تحديث…", "Checking for updates…"), enabled: false };
-    return { label: st === "none" ? T("النسخة دي هي الأحدث", "You are up to date") + " (" + app.getVersion() + ")" : T("دوّر على تحديث", "Check for updates"), enabled: st !== "none" || true, click: () => global.__check && global.__check() };
+    if (st === "error") return { label: T("تعذّر فحص التحديث، جرّب تاني", "Update check failed, try again"), click: () => global.__check && global.__check(true) };
+    return { label: st === "none" ? T("النسخة دي هي الأحدث", "You are up to date") + " (" + app.getVersion() + ")" : T("دوّر على تحديث", "Check for updates"), enabled: st !== "none" || true, click: () => global.__check && global.__check(true) };
   };
   const build = () => Menu.buildFromTemplate([
+    { label: "Noctua " + app.getVersion(), enabled: false },
     { label: T("فتح نوكتوا", "Open Noctua"), click: showWindow },
     updItem(),
     { type: "separator" },
