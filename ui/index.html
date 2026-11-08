@@ -1,0 +1,818 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Noctua</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%F0%9F%A6%89%3C/text%3E%3C/svg%3E">
+<style>
+:root{color-scheme:dark;--bg:#000;--card:#070707;--tx:#ece8dc;--mut:#8d897d;--bd:#1f1f1f;--bd2:#333;--ac:#ffb000;--pass:#5fd4a0;--warn:#ff8a3d;--fail:#ff4b4b;--skip:#6b675d;--inp:#0b0b0b;--moon:#f4efe0}
+*{box-sizing:border-box}
+html{background:#000}
+body{margin:0;min-height:100vh;color:var(--tx);font:15px/1.6 "Segoe UI",Tahoma,system-ui,sans-serif;background:radial-gradient(420px circle at var(--mx,50%) var(--my,15%),rgba(255,176,0,.075),transparent 65%),#000;background-attachment:fixed}
+body[data-eye=alarm]{background:radial-gradient(420px circle at var(--mx,50%) var(--my,15%),rgba(255,75,75,.09),transparent 65%),#000;background-attachment:fixed}
+.wrap{max-width:980px;margin:0 auto;padding:18px 18px 80px}
+header{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:4px 0 8px}
+.brand{display:flex;align-items:center;gap:20px}
+#eye{width:104px;height:104px;flex:none;filter:drop-shadow(0 0 20px rgba(255,176,0,.3))}
+body[data-eye=alarm] #eye{filter:drop-shadow(0 0 20px rgba(255,75,75,.45))}
+#eye .iris{fill:url(#irisG)}body[data-eye=alarm] #eye .iris{fill:url(#irisR)}
+#eye .pupil{transform-box:fill-box;transform-origin:center;transition:transform .5s ease}
+body[data-eye=run] #eye .pupil{transform:scale(.55,1.1)}
+#eye .lid{transform-box:fill-box;transform-origin:center top;transform:scaleY(0);animation:blink 11s infinite}
+body[data-eye=alarm] #eye .lid{animation:none;transform:scaleY(.38)}
+body[data-eye=run] #eye .iris{animation:scan 1.6s ease-in-out infinite alternate}
+@keyframes blink{0%,95%,100%{transform:scaleY(0)}97%{transform:scaleY(1)}}
+@keyframes scan{from{opacity:.75}to{opacity:1}}
+h1{margin:0;font:400 34px/1.1 "Palatino Linotype",Sylfaen,Georgia,serif;letter-spacing:.16em;color:var(--moon)}
+header p{margin:6px 0 0;color:var(--mut);max-width:34ch}
+/* tabs */
+#tabs{display:flex;gap:30px;border-bottom:1px solid var(--bd);margin:18px 0 26px}
+#tabs button{position:relative;background:none;border:0;border-radius:0;padding:10px 2px 12px;font-size:17px;color:var(--mut)}
+#tabs button[aria-selected=true]{color:var(--moon)}
+#tabs button[aria-selected=true]::after{content:"";position:absolute;inset-inline:0;bottom:-1px;height:2px;background:var(--ac)}
+#tabs button:hover{color:var(--moon);border:0}
+body[data-eye=alarm] #tabWatch::before,body[data-eye=run] #tabTest::before{content:"";position:absolute;top:10px;inset-inline-end:-10px;width:7px;height:7px;border-radius:50%;background:var(--fail)}
+body[data-eye=run] #tabTest::before{background:var(--ac)}
+[data-panel][hidden]{display:none!important}
+/* shared */
+h2{font:400 21px/1.3 "Palatino Linotype",Sylfaen,Georgia,serif;margin:0 0 6px;color:var(--moon)}
+.help{color:var(--mut);font-size:13px;margin:2px 0 0}
+label.l{display:block;font-weight:600;margin:12px 0 4px;color:var(--mut)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+input[type=text],input[type=password],input[type=number],select{width:100%;padding:11px 13px;border:1px solid var(--bd2);border-radius:0;background:var(--inp);color:var(--tx);font:inherit;direction:ltr;text-align:left}
+input:focus,select:focus{outline:0;border-color:var(--ac);box-shadow:0 0 0 1px var(--ac)}
+button:focus-visible,summary:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+button{font:inherit;padding:9px 18px;border-radius:0;border:1px solid var(--bd2);background:transparent;color:var(--tx);cursor:pointer}
+button:hover:not(:disabled){border-color:var(--ac);color:var(--ac)}
+button.go{background:var(--ac);color:#000;border-color:var(--ac);font-weight:700;padding:11px 28px}
+button.go:hover:not(:disabled){background:#ffc83d;color:#000}
+button.stop{border-color:#5a2020;color:var(--fail)}button.stop:hover:not(:disabled){border-color:var(--fail);color:var(--fail)}
+button:disabled{opacity:.45;cursor:default}
+.btns{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;align-items:center}
+#err,#mErr{color:var(--fail);font-weight:600}
+details.more{margin-top:16px;border-top:1px solid var(--bd);padding-top:12px}
+details.more>summary,details:not(.sec)>summary{cursor:pointer;font-weight:600;color:var(--mut)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.banner{padding:10px 14px;margin-bottom:16px;border:1px solid var(--warn);color:var(--warn)}
+/* watch */
+.addbar{display:flex;gap:0;margin:18px 0 0}.addbar input{flex:1;font-size:17px;padding:14px 16px}.addbar button{flex:none}
+.watch{margin-top:22px;border-top:1px solid var(--bd)}
+.wrow{display:grid;grid-template-columns:12px minmax(160px,1.2fr) 230px auto auto;gap:10px 22px;align-items:center;padding:18px 6px;border-bottom:1px solid var(--bd);position:relative}
+.wrow.down{background:linear-gradient(90deg,rgba(255,75,75,.10),transparent 70%)}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--skip)}
+.wrow.up .dot{background:var(--pass);animation:breathe 3.2s ease-in-out infinite}.wrow.down .dot{background:var(--fail)}
+@keyframes breathe{0%,100%{box-shadow:0 0 0 0 rgba(95,212,160,.55)}60%{box-shadow:0 0 0 8px rgba(95,212,160,0)}}
+.who{min-width:0}.who b{display:block;font-size:17px;color:var(--moon)}.who .url{display:block;color:var(--mut);font-size:12px;direction:ltr;text-align:start;overflow:hidden;text-overflow:ellipsis}
+.who .st{font-size:13px;font-weight:700}.wrow.up .st{color:var(--pass)}.wrow.down .st{color:var(--fail)}.wrow.off .st{color:var(--skip)}
+.note{display:block;color:var(--warn);font-size:12px}
+.nums{display:flex;gap:22px;margin:0}.nums div{text-align:start}.nums dt{color:var(--mut);font-size:11px}.nums dd{margin:0;font-size:16px;font-weight:600;font-variant-numeric:tabular-nums;direction:ltr}
+.acts{display:flex;gap:6px;flex-wrap:wrap}.acts button{padding:3px 10px;font-size:12px;color:var(--mut);border-color:var(--bd2)}
+.deepline{grid-column:2/-1;font-size:13px;color:var(--mut);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+@media(max-width:760px){.grid{grid-template-columns:1fr}#eye{width:78px;height:78px}h1{font-size:26px}.wrow{grid-template-columns:12px 1fr}.wrow .spk,.wrow .nums,.wrow .acts{grid-column:2}}
+
+/* monitor: sub-screens */
+#subnav{display:flex;gap:0;margin:0 0 22px;border:1px solid var(--bd2);width:max-content;max-width:100%;overflow-x:auto}
+#subnav button{border:0;border-inline-end:1px solid var(--bd2);padding:8px 20px;font-size:15px;color:var(--mut);white-space:nowrap}
+#subnav button:last-child{border-inline-end:0}
+#subnav button[aria-selected=true]{background:rgba(255,176,0,.1);color:var(--ac)}
+#subnav button:hover:not(:disabled){border-color:var(--bd2);border-inline-end:1px solid var(--bd2)}
+.v{direction:ltr;unicode-bidi:isolate;display:inline-block}
+.sumstrip{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--bd2);margin:16px 0 8px}
+.sumstrip>div{padding:14px 18px;border-inline-end:1px solid var(--bd)}.sumstrip>div:last-child{border-inline-end:0}
+.sumstrip dt{color:var(--mut);font-size:12px}.sumstrip dd{margin:2px 0 0;font-size:26px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--moon)}
+.sumstrip dd.bad{color:var(--fail)}.sumstrip dd.good{color:var(--pass)}.sumstrip dd.mid{color:var(--warn)}
+.verdict{margin:6px 0 0;font-size:15px;color:var(--mut)}.verdict.bad{color:var(--fail)}.verdict.mid{color:var(--warn)}.verdict.good{color:var(--pass)}
+.wrow.warn .dot{background:var(--warn)}.wrow.warn .st{color:var(--warn)}.wrow.nonet .st{color:var(--mut)}
+.wrow.warn{background:linear-gradient(90deg,rgba(255,138,61,.07),transparent 60%)}
+.lnk{background:none;border:0;padding:0;text-align:start;font-size:17px;font-weight:700;color:var(--moon)}.lnk:hover:not(:disabled){color:var(--ac);border:0}
+.strip{grid-column:2/-1;display:flex;gap:2px;direction:ltr;height:12px}.strip i{flex:1;background:var(--bd2);min-width:2px}.strip i.g{background:#2f7d5d}.strip i.y{background:var(--warn)}.strip i.r{background:var(--fail)}
+.pick{display:inline-flex;align-items:center;gap:8px;padding:5px 14px;margin:0 0 8px;margin-inline-end:8px;font-size:14px}
+.pick.on{border-color:var(--ac);color:var(--ac)}.pick i{width:8px;height:8px;border-radius:50%;background:var(--skip)}
+.pick i.up{background:var(--pass)}.pick i.warn{background:var(--warn)}.pick i.down{background:var(--fail)}
+.shead{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;margin:6px 0 4px}
+.shead h2{font-size:26px;margin:0}.shead .url{direction:ltr;text-align:start;color:var(--mut);font-size:13px;display:block}
+.lvl{display:inline-block;font-weight:700;font-size:13px;padding:1px 12px;border:1px solid currentColor;border-radius:99px;margin-inline-end:8px}
+.lvl.up{color:var(--pass)}.lvl.warn{color:var(--warn)}.lvl.down{color:var(--fail)}.lvl.off,.lvl.wait,.lvl.nonet{color:var(--skip)}
+.blk{border-top:1px solid var(--bd);margin-top:26px;padding-top:16px}.blk h3{font:400 18px/1.3 "Palatino Linotype",Sylfaen,Georgia,serif;margin:0 0 10px;color:var(--moon)}
+.wf{display:flex;height:16px;direction:ltr;gap:2px;margin:10px 0 8px}.wf i{display:block;min-width:3px}
+.wfk{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:13px;color:var(--mut)}.wfk span{display:inline-flex;gap:7px;align-items:center}.wfk b{color:var(--tx);font-variant-numeric:tabular-nums;direction:ltr;unicode-bidi:isolate}
+.wfk em{width:10px;height:10px;display:inline-block}
+.stages{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.stages span{padding:3px 12px;border:1px solid var(--bd2);color:var(--skip);font-size:13px}.stages span.ok{border-color:#2f7d5d;color:var(--pass)}.stages span.no{border-color:var(--fail);color:var(--fail);font-weight:700}
+.tbl{width:100%;border-collapse:collapse;font-size:14px}.tbl th{color:var(--mut);font-weight:600;text-align:start;padding:6px 10px 6px 0;font-size:12px;border-bottom:1px solid var(--bd2)}
+.tbl td{padding:7px 10px 7px 0;border-bottom:1px solid #141414;font-variant-numeric:tabular-nums;vertical-align:top}.tbl .ltr{direction:ltr;text-align:start;unicode-bidi:isolate}
+.tbl .bad{color:var(--fail)}.tbl .good{color:var(--pass)}.tbl .mid{color:var(--warn)}.scroll{overflow-x:auto}
+.facts{display:grid;grid-template-columns:1fr 1fr;gap:0 32px;margin:0}.facts div{display:flex;justify-content:space-between;gap:14px;padding:7px 0;border-bottom:1px solid #141414}
+.facts dt{color:var(--mut);font-size:13px}.facts dd{margin:0;font-weight:600;text-align:end;min-width:0;word-break:break-word;direction:ltr;unicode-bidi:isolate}
+.chips{display:flex;flex-wrap:wrap;gap:8px}.chip{padding:3px 12px;border:1px solid var(--bd2);font-size:13px;color:var(--skip)}.chip.ok{border-color:#2f7d5d;color:var(--pass)}.chip.no{color:var(--mut)}
+.tog{display:inline-flex;margin-inline-start:12px;vertical-align:middle}.tog button{padding:2px 12px;font-size:12px;border-color:var(--bd2);color:var(--mut)}.tog button.on{border-color:var(--ac);color:var(--ac)}
+.chart svg{width:100%;height:auto;display:block;direction:ltr}
+.bigbox{display:flex;align-items:center;gap:18px;padding:16px 20px;border:1px solid var(--bd2);border-inline-start-width:4px;margin-bottom:14px}
+.bigbox.up{border-inline-start-color:var(--pass)}.bigbox.down{border-inline-start-color:var(--fail);background:rgba(255,75,75,.07)}
+.bigbox b{font:400 24px/1.2 "Palatino Linotype",Sylfaen,Georgia,serif;color:var(--moon);display:block}
+.meter{height:8px;background:var(--bd);margin:6px 0 4px}.meter i{display:block;height:100%;background:var(--ac)}.meter.hot i{background:var(--warn)}.meter.crit i{background:var(--fail)}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:26px}.cols .blk{margin-top:26px}
+textarea{width:100%;padding:11px 13px;border:1px solid var(--bd2);border-radius:0;background:var(--inp);color:var(--tx);font:inherit;direction:ltr;text-align:left;resize:vertical;min-height:70px}
+textarea:focus{outline:0;border-color:var(--ac);box-shadow:0 0 0 1px var(--ac)}
+@media(max-width:760px){.sumstrip{grid-template-columns:1fr 1fr}.sumstrip>div:nth-child(2){border-inline-end:0}.sumstrip>div:nth-child(-n+2){border-bottom:1px solid var(--bd)}.facts,.cols{grid-template-columns:1fr}.strip{grid-column:1/-1}}
+/* test */
+#site{font-size:19px;padding:16px 18px;border-color:var(--bd2)}
+.lenses{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0 4px}@media(max-width:760px){.lenses{grid-template-columns:1fr}}
+.opt{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border:1px solid var(--bd2);cursor:pointer;margin:0}
+.opt:has(input:checked){border-color:var(--ac);background:rgba(255,176,0,.06)}
+.opt input{margin-top:5px;width:16px;height:16px;flex:none;accent-color:var(--ac)}.opt b{display:block;color:var(--moon)}.opt .help{font-size:12px}
+.chk{display:flex;gap:8px;align-items:center;margin:6px 0}
+#formCard{border:0;padding:0;margin:0 0 26px}
+.bar{height:2px;background:var(--bd);overflow:hidden;margin:10px 0}
+.bar i{display:block;height:100%;width:30%;background:linear-gradient(90deg,transparent,var(--ac),transparent);animation:mv 1.3s ease-in-out infinite alternate}
+@keyframes mv{from{margin-inline-start:0}to{margin-inline-start:70%}}
+.bar.off i{animation:none;width:100%;opacity:.25}
+#live>.card{border:1px solid var(--bd);padding:18px 20px;margin-bottom:14px;background:var(--card)}
+.counts{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px}
+.pill{padding:1px 11px;border-radius:99px;font-weight:700;border:1px solid currentColor;font-size:13px}
+.pill.PASS{color:var(--pass)}.pill.WARN{color:var(--warn)}.pill.FAIL{color:var(--fail)}.pill.SKIP{color:var(--skip)}.pill.T{color:var(--mut)}
+details.sec{border-top:1px solid var(--bd);margin:0}
+details.sec>summary{padding:10px 4px;font-weight:700;cursor:pointer;color:var(--moon)}
+.row{display:flex;gap:12px;padding:7px 4px;border-top:1px solid #141414;align-items:flex-start}
+.badge{flex:none;min-width:54px;text-align:center;font-weight:700;font-size:11px;padding:2px 6px;color:#000;margin-top:3px}
+.lvl-PASS .badge{background:var(--pass)}.lvl-WARN .badge{background:var(--warn)}.lvl-FAIL .badge{background:var(--fail)}.lvl-SKIP .badge{background:var(--skip);color:#fff}
+.rc{min-width:0;flex:1}.nm{font-weight:600}.dt{color:var(--mut);font-size:13px;word-break:break-word}
+.hint{font-size:13px;margin-top:4px;padding:6px 10px;background:rgba(255,176,0,.08);border-inline-start:2px solid var(--ac)}
+.sum{padding:18px 20px;border:1px solid;margin-bottom:14px}
+.sum.ok{border-color:var(--pass);background:rgba(95,212,160,.06)}.sum.w{border-color:var(--warn);background:rgba(255,138,61,.07)}.sum.bad{border-color:var(--fail);background:rgba(255,75,75,.08)}
+.sum h2{font-size:22px;margin:0 0 4px}
+/* log */
+.tl{margin:18px 0 0;border-inline-start:1px solid var(--bd2);padding-inline-start:20px}
+.ev{position:relative;padding:0 0 18px}.ev::before{content:"";position:absolute;inset-inline-start:-25px;top:7px;width:9px;height:9px;border-radius:50%;background:var(--skip);box-shadow:0 0 0 3px #000}
+.ev.down::before,.ev.deep::before{background:var(--fail)}.ev.changed::before{background:var(--warn)}.ev.up::before{background:var(--pass)}
+.ev time{display:block;color:var(--mut);font-size:12px;direction:ltr;text-align:start}
+.hist{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--bd);flex-wrap:wrap}
+.hist .sp{flex:1;min-width:140px;direction:ltr;text-align:start;color:var(--mut);font-size:13px}
+a{color:var(--ac)}pre{background:var(--inp);border:1px solid var(--bd);padding:8px;max-height:200px;overflow:auto;font-size:12px;direction:ltr;text-align:left}
+#live details.card>summary{cursor:pointer;color:var(--mut)}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:reduce){#eye .lid,#eye .iris,.bar i,.dot{animation:none!important}#eye .pupil{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand"><svg id="eye" viewBox="0 0 120 120" aria-hidden="true"><defs>
+<radialGradient id="irisG" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="#ffe7a3"/><stop offset=".55" stop-color="#ffb000"/><stop offset="1" stop-color="#8a5a00"/></radialGradient>
+<radialGradient id="irisR" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="#ffb3a8"/><stop offset=".55" stop-color="#ff6b5e"/><stop offset="1" stop-color="#7a1b1b"/></radialGradient>
+<clipPath id="ball"><circle cx="60" cy="60" r="50"/></clipPath></defs>
+<circle cx="60" cy="60" r="55" fill="#050505" stroke="#3a3a3a" stroke-width="2"/>
+<circle cx="60" cy="60" r="50" fill="#0d0d0d"/>
+<g clip-path="url(#ball)"><circle class="iris" cx="60" cy="60" r="34"/>
+<g id="pupilG"><ellipse class="pupil" cx="60" cy="60" rx="14" ry="22" fill="#05040d"/><circle cx="52" cy="50" r="5" fill="#fff" opacity=".85"/></g>
+<rect class="lid" x="0" y="0" width="120" height="120" fill="#000"/></g></svg><div><h1 data-t="title"></h1><p data-t="sub"></p></div></div>
+    <button id="langBtn" type="button">EN</button>
+  </header>
+
+  <nav id="tabs" role="tablist"><button type="button" role="tab" id="tabWatch" data-tab="watch"></button><button type="button" role="tab" id="tabTest" data-tab="test"></button><button type="button" role="tab" id="tabLog" data-tab="log"></button></nav>
+
+  <div id="pwBanner" class="banner" hidden data-t="pwMissing"></div>
+
+  <section id="mon" data-panel="watch">
+    <nav id="subnav" role="tablist"><button type="button" role="tab" data-sub="over"></button><button type="button" role="tab" data-sub="site"></button><button type="button" role="tab" data-sub="dev"></button></nav>
+
+    <div id="vOver" data-sub-panel="over">
+      <h2 id="mTitle"></h2>
+      <p class="help" id="mHelp"></p>
+      <div id="mSum"></div>
+      <div class="addbar"><label class="sr" id="mUrlL" for="mUrl"></label><input type="text" id="mUrl" placeholder="https://your-site.com" spellcheck="false" autocomplete="off"><button type="button" class="go" id="mAddBtn"></button></div>
+      <span id="mErr"></span>
+      <details class="more"><summary id="mAddT"></summary>
+        <div class="grid">
+          <div><label class="l" id="mNameL" for="mName"></label><input type="text" id="mName"></div>
+          <div><label class="l" id="mLightL" for="mLight"></label><input type="number" id="mLight" value="5" min="1"></div>
+          <div><label class="l" id="mDeepL" for="mDeep"></label><input type="number" id="mDeep" value="0" min="0"><p class="help" id="mDeepH"></p></div>
+        </div>
+      </details>
+      <div id="mList" class="watch"></div>
+    </div>
+
+    <div id="vSite" data-sub-panel="site" hidden>
+      <div id="sitePick"></div>
+      <div id="siteBody"></div>
+      <details class="more" id="setBox"><summary id="setT"></summary>
+        <div class="grid">
+          <div><label class="l" id="sNameL" for="sName"></label><input type="text" id="sName"></div>
+          <div><label class="l" id="sLightL" for="sLight"></label><input type="number" id="sLight" min="1"></div>
+          <div><label class="l" id="sSlowL" for="sSlow"></label><input type="number" id="sSlow" min="200"></div>
+          <div><label class="l" id="sDeepL" for="sDeep"></label><input type="number" id="sDeep" min="0"></div>
+          <div><label class="l" id="sKwL" for="sKw"></label><input type="text" id="sKw"></div>
+          <div><label class="l" id="sTokL" for="sTok"></label><input type="password" id="sTok" autocomplete="off"></div>
+        </div>
+        <label class="l" id="sPathsL" for="sPaths"></label><textarea id="sPaths" spellcheck="false" placeholder="/api/health&#10;/login"></textarea>
+        <label class="chk" style="margin-top:12px"><input type="checkbox" id="sWatch" style="accent-color:var(--ac)"><span id="sWatchL"></span></label>
+        <div class="btns"><button type="button" class="go" id="sSave"></button><span id="sMsg" class="help"></span></div>
+      </details>
+    </div>
+
+    <div id="vDev" data-sub-panel="dev" hidden>
+      <div id="devBody"></div>
+      <details class="more" id="alBox"><summary id="mAlT"></summary>
+        <p class="help" id="mAlH"></p>
+        <div class="grid">
+          <div><label class="l">Telegram bot token</label><input type="password" id="aTg"></div>
+          <div><label class="l">Telegram chat id</label><input type="text" id="aChat"></div>
+        </div>
+        <label class="l">Webhook (Slack / Discord, https://)</label><input type="text" id="aHook">
+        <div class="btns"><button type="button" id="aSave"></button><button type="button" id="aTest"></button><span id="aMsg" class="help"></span></div>
+      </details>
+      <div class="btns" style="margin-top:30px"><button type="button" class="stop" id="quitBtn"></button></div>
+    </div>
+  </section>
+
+  <div data-panel="test" hidden>
+  <section id="formCard">
+    <label class="l" for="site" data-t="site"></label>
+    <input type="text" id="site" placeholder="https://your-site.vercel.app" spellcheck="false" autocomplete="off">
+
+    <h2 style="margin-top:16px" data-t="whatTitle"></h2>
+    <div class="lenses">
+    <label class="opt"><input type="checkbox" id="api" checked><span><b data-t="api"></b><span class="help" data-t="apiD"></span></span></label>
+    <label class="opt"><input type="checkbox" id="ui" checked><span><b data-t="ui"></b><span class="help" data-t="uiD"></span></span></label>
+    <label class="opt"><input type="checkbox" id="bench" checked><span><b data-t="bench"></b><span class="help" data-t="benchD"></span></span></label>
+    </div>
+
+    <details style="margin-top:14px">
+      <summary data-t="keysTitle" style="cursor:pointer;font-weight:700"></summary>
+    <div class="grid">
+      <div><label class="l" for="token" data-t="token"></label><input type="password" id="token" autocomplete="off"><div class="help" data-t="tokenD"></div></div>
+      <div></div>
+      <div><label class="l" for="groqKey" data-t="groq"></label><input type="password" id="groqKey" autocomplete="off"></div>
+      <div><label class="l" for="geminiKey" data-t="gemini"></label><input type="password" id="geminiKey" autocomplete="off"></div>
+    </div>
+    <div class="help" data-t="keysNote"></div>
+    <label class="chk"><input type="checkbox" id="remember"><span data-t="remember"></span></label>
+    <button type="button" id="forget" data-t="forget" hidden></button>
+    </details>
+
+    <details style="margin-top:12px">
+      <summary data-t="optTitle" style="cursor:pointer;font-weight:700"></summary>
+      <label class="chk"><input type="checkbox" id="light"><span data-t="light"></span></label>
+      <label class="chk"><input type="checkbox" id="quick"><span data-t="quick"></span></label>
+      <label class="chk"><input type="checkbox" id="headed"><span data-t="headed"></span></label>
+      <div class="grid">
+        <div><label class="l" for="expect" data-t="expect"></label>
+          <select id="expect"><option value="" data-t="expectNone"></option><option value="groq">Groq</option><option value="gemini">Gemini</option></select></div>
+        <div><label class="l" for="maxClicks" data-t="maxClicks"></label><input type="number" id="maxClicks" min="5" max="200" placeholder="40"></div>
+      </div>
+      <label class="l" for="models" data-t="models"></label>
+      <input type="text" id="models" placeholder="groq:llama-3.1-8b-instant,gemini:gemini-3.5-flash-lite" spellcheck="false">
+      <div class="help" data-t="modelsD"></div>
+    </details>
+
+    <div class="btns">
+      <button class="go" id="goBtn" type="button" data-t="start"></button>
+      <button class="stop" id="stopBtn" type="button" data-t="stop" hidden></button>
+      <span id="err"></span>
+    </div>
+  </section>
+
+  <section id="live" hidden>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+        <b id="runLabel"></b><span class="help"><span data-t="time"></span>: <span id="clock" dir="ltr">0:00</span></span>
+      </div>
+      <div class="help" id="status" style="min-height:1.2em"></div>
+      <div class="bar" id="bar"><i></i></div>
+      <div class="counts" id="counts"></div>
+      <div id="sum" hidden></div>
+      <div id="attn" hidden></div>
+      <div class="btns" id="doneBtns" hidden>
+        <button type="button" id="copyBtn" data-t="copy"></button>
+        <a id="reportLink" target="_blank" data-t="report" href="#"></a>
+        <span class="help" id="copyMsg"></span>
+      </div>
+    </div>
+    <div id="results"></div>
+    <details class="card"><summary data-t="log" style="cursor:pointer"></summary><pre id="log"></pre></details>
+  </section>
+  </div>
+
+  <section data-panel="log" hidden>
+    <h2 id="incT"></h2>
+    <div id="incList" class="tl"></div>
+    <h2 data-t="history" style="margin-top:34px"></h2>
+    <div id="hist"></div>
+  </section>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+const T = {
+  ar: {
+    title: "Noctua", sub: "بومة بتشوف في الضلمة: اختبر موقعك كله بضغطة واحدة", site: "رابط الموقع", whatTitle: "إيه اللي يتختبر؟",
+    api: "الموقع والـ API", apiD: "بيجرب الموقع زي المستخدم من غير ما يعرف الموديلات: بيتأكد إن الردود صح وجديدة ومش ثابتة ومش بتخرف. حوالي 26 سؤال. لو وصل لحد الموقع (30 كل 10 دقايق) بيستنى لوحده، فالاختبار الكامل ممكن ياخد لحد 12 دقيقة.",
+    ui: "الواجهة في المتصفح", uiD: "بيفتح متصفح ويدوس على كل حاجة ويجرب الشات ورفع الـ CV.",
+    bench: "اختبار الموديلات مباشرة (لو دخلت مفاتيح)", benchD: "اختياري. من غير مفاتيح الأداة بتقيّم الموديلات من خلال الموقع (بطاقة نتيجة لكل مجموعة). ومع المفاتيح بتزود الأسماء والحدود والترتيب المقترح.",
+    keysTitle: "مفاتيح (اختيارية، للاختبار المباشر بس)", token: "توكن الأدمن (AI_ADMIN_TOKEN)", tokenD: "لاختبار كل موديل لوحده على الموقع. محتاج ملف ai-check.js على الموقع.",
+    groq: "مفتاح Groq", gemini: "مفتاح Gemini", keysNote: "المفاتيح بتروح لموقعك أو للمزود (Groq وGemini) بس، ومابتتكتبش في التقرير.",
+    remember: "احفظ المفاتيح على الجهاز ده (بنص عادي في ملف settings.json)", forget: "امسح المفاتيح المحفوظة",
+    optTitle: "خيارات إضافية", light: "اختبار AI خفيف (أسئلة أقل وأسرع، من غير الفحوصات العميقة)", quick: "سريع (كمبيوتر بس وضغطات أقل)", headed: "اعرض نافذة المتصفح وهو شغال",
+    expect: "المزود المتوقع إنه يرد على الموقع", expectNone: "مش مهم", maxClicks: "أقصى عدد ضغطات", models: "الموديلات (للاختبار المباشر)", modelsD: "سيبه فاضي عشان يختبر الموديلات الحالية بتاعتك.",
+    start: "ابدأ الاختبار", stop: "إيقاف", time: "الوقت", running: "الاختبار شغال...",
+    PASS: "نجح", WARN: "تحذير", FAIL: "فشل", SKIP: "اتخطى", total: "الكل",
+    attention: "اللي محتاج انتباهك", copy: "انسخ النتيجة", copied: "اتنسخت. الصقها في الشات.", report: "افتح التقرير الكامل", log: "السجل التقني",
+    history: "الاختبارات السابقة", noHist: "لسه مفيش اختبارات.", pwMissing: "الاختبار العميق محتاج Microsoft Edge أو Google Chrome منزّل على الجهاز.",
+    finished: "الاختبار خلص", needOne: "اختار حاجة واحدة على الأقل.", stopped: "الاختبار اتوقف.", crashed: "الاختبار وقف فجأة. افتح السجل التقني تحت.",
+    okT: "كل حاجة سليمة", okD: "مفيش فشل ولا تحذيرات.", warnT: "شغال، بس فيه تحذيرات", warnD: "مفيش حاجة مكسورة، لكن فيه نقاط تتحسن.", badT: "فيه حاجات مكسورة", badD: "ابدأ بسطور الفشل، وتحتها اقتراح لكل واحدة.",
+    open: "فتح", by: "على", ago: ""
+  },
+  en: {
+    title: "Noctua", sub: "An owl that sees in the dark: test your whole site with one click", site: "Site address", whatTitle: "What to test",
+    api: "Site and API", apiD: "Tests the site like a user, without knowing the models: checks the answers are right, fresh, not canned and not rambling. About 26 questions. If the site's limit (30 per 10 min) is reached it waits by itself, so a full test can take up to 12 minutes.",
+    ui: "Browser interface", uiD: "Opens a browser, clicks everything, tries chat and CV upload.",
+    bench: "Direct model test (if you enter keys)", benchD: "Optional. Without keys the tool judges the models through the site (a scorecard per group). With keys it adds the names, the limits and a suggested order.",
+    keysTitle: "Keys (optional, only for the direct test)", token: "Admin token (AI_ADMIN_TOKEN)", tokenD: "Tests each model one by one on the site. Needs ai-check.js on the site.",
+    groq: "Groq key", gemini: "Gemini key", keysNote: "Keys go only to your site or to the provider (Groq, Gemini). They are never written to the report.",
+    remember: "Remember keys on this computer (plain text in settings.json)", forget: "Delete saved keys",
+    optTitle: "More options", light: "Light AI test (fewer questions, faster, skips the deep checks)", quick: "Quick (desktop only, fewer clicks)", headed: "Show the browser window while it runs",
+    expect: "Provider expected to answer on the site", expectNone: "Do not care", maxClicks: "Max clicks", models: "Models (direct test)", modelsD: "Leave empty to test your current models.",
+    start: "Start the test", stop: "Stop", time: "Time", running: "Test is running...",
+    PASS: "PASS", WARN: "WARN", FAIL: "FAIL", SKIP: "SKIP", total: "Total",
+    attention: "Needs your attention", copy: "Copy results", copied: "Copied. Paste it in the chat.", report: "Open the full report", log: "Technical log",
+    history: "Previous tests", noHist: "No tests yet.", pwMissing: "The deep browser test needs Microsoft Edge or Google Chrome installed on this computer.",
+    finished: "Test finished", needOne: "Pick at least one thing to test.", stopped: "The test was stopped.", crashed: "The test stopped suddenly. Open the technical log below.",
+    okT: "Everything is fine", okD: "No failures and no warnings.", warnT: "Working, with warnings", warnD: "Nothing is broken, but some things can be better.", badT: "Some things are broken", badD: "Start with the FAIL lines. Each has a suggestion below it.",
+    open: "Open", by: "on", ago: ""
+  },
+};
+// Plain-language help for common problems. First match wins.
+const HINTS = [
+  [/Model failing on the site/i, "الموقع نفسه قال إن الموديل ده فشل، ومكتوب جنبه السبب. 404 يعني الاسم غلط أو مفيش صلاحية، و401 المفتاح مرفوض، والتايم أوت يعني أبطأ من 6 ثواني. صلّحه في Vercel (AI_FAST أو AI_SMART أو المفتاح) وRedeploy.", "The site itself reported this model failed, with the reason. 404 means a wrong name or no access, 401 a rejected key, timeout slower than 6 seconds. Fix it in Vercel (AI_FAST, AI_SMART or the key) and redeploy."],
+  [/rests its models/i, "لما موديلين يفشلوا مرة، السيرفر بيسيبهم دقيقة. المستخدم في الوقت ده بياخد رد جاهز بدل رد الـ AI. الحل إنك تصلّح الموديل الفاشل (الصف فوق).", "When two models fail once, the server rests them for a minute and users get the built-in reply instead of the AI. Fix the failing model (row above)."],
+  [/slower than the site's 6s/i, "الموقع بيدي كل موديل 6 ثواني، وأي رد أبطأ معناه إن الموديل الأول فشل أو اتأخر والاحتياطي هو اللي ردّ. راجع صفوف الموديلات الفاشلة، أو شغّل الاختبار المباشر بمفاتيحك.", "The site gives each model 6 seconds. A slower answer means the first model failed or was slow and a backup answered. Check the failing-model rows, or run the direct test with your keys."],
+  [/not canned|canned/i, "الموقع بيرد بنفس الرد تقريباً على أسئلة مختلفة. غالباً الـ AI مش بيقرا الأسئلة أو الملفات فعلاً.", "The site gives almost the same answer to different questions. The AI is probably not really reading the questions or the files."],
+  [/look like nonsense/i, "فيه ردود بتكرر نفسها أو فيها حروف غريبة. جرّب موديل تاني أو قلّل temperature.", "Some answers repeat themselves or contain strange characters. Try another model or lower the temperature."],
+  [/fresh fact|remembers the conversation|plays the persona/i, "الـ AI ما استخدمش المعلومة الجديدة اللي حطيناله في الملفات أو المحادثة. يعني ردّه مش مبني على المدخلات. راجع الـ prompt أو جرّب موديل أقوى.", "The AI did not use the new fact we put in the files or the conversation, so its answer is not based on its input. Check the prompt or try a stronger model."],
+  [/Model health check.*404|ai-check/i, "الفحص المفصّل للموديلات محتاج ملف api/ai-check.js على الموقع. لو مش عايز ترفعه، سيب التوكن فاضي واستخدم \"الموديلات مباشرة\".", "The per-model check needs api/ai-check.js on the site. If you do not want to upload it, leave the token empty and use the direct models test."],
+  [/Admin endpoint refuses/i, "الـ endpoint ده مفتوح لأي حد. لازم يتقفل بالتوكن أو يتشال.", "This endpoint is open to anyone. Protect it with the token or remove it."],
+  [/429|rate limit/i, "وصلت لحد الطلبات. استنى 10 دقايق وأعد الاختبار.", "Rate limit reached. Wait 10 minutes and run again."],
+  [/ERR_NETWORK|net::ERR|fetch failed/i, "مشكلة اتصال لحظية في النت أو الرابط غلط. أعد الاختبار وراجع الرابط.", "A short network problem, or a wrong address. Run again and check the address."],
+  [/rejected the key/i, "المزود رفض المفتاح، يعني الموقع عمره ما هيستخدمه. اعمل مفتاح جديد من موقع المزود.", "The provider rejected the key, so the site can never use it. Make a new key on the provider's site."],
+  [/not on your account/i, "اسم الموديل مش موجود في حسابك. غيّره في Vercel (AI_FAST أو AI_SMART) وRedeploy.", "The model id is not on your account. Change it in Vercel (AI_FAST or AI_SMART) and redeploy."],
+  [/would skip it|slower than/i, "الموقع بيدي كل موديل 6 ثواني بس ويتخطاه بعدها. شيله أو خليه آخر واحد في القايمة.", "The site gives each model only 6 seconds, then skips it. Remove it or put it last."],
+  [/fallback is answering/i, "الموديل الاحتياطي هو اللي بيرد، يعني الأساسي واقع. راجع مفتاحه وحده.", "The backup model is answering, so the main one is failing. Check its key and limit."],
+  [/Deep links/i, "تتجاهله لو الموقع مش بيغيّر الرابط بين الصفحات.", "Ignore it if the site does not change the address between pages."],
+  [/Chat from the screen|File upload|Site survives AI errors/i, "الأداة ماوصلتش للشاشة دي من نفسها. محتاجة خطوات مكتوبة (flow) في checker.config.json.", "The tool could not reach that screen by itself. It needs written steps (a flow) in checker.config.json."],
+  [/invent|salary/i, "الموديل بيخترع معلومات مش موجودة. جرّب موديل تاني أو شدّد التعليمات في الـ prompt.", "The model invents facts. Try another model or tighten the prompt rules."],
+  [/JavaScript error|went blank/i, "في كود الموقع خطأ بيوقع الصفحة. افتح لقطة الشاشة في التقرير، وابعت لي الرسالة.", "There is a code error that breaks the page. Open the screenshot in the report and send me the message."],
+];
+const hintFor = (r) => { if (r.level === "PASS") return ""; const h = HINTS.find((x) => x[0].test(r.name + " " + r.detail)); return h ? h[lang === "ar" ? 1 : 2] : ""; };
+
+let lang = localStorage.getItem("mm_lang") || "ar";
+const t = (k) => T[lang][k] ?? k;
+function applyLang() {
+  document.documentElement.lang = lang; document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
+  document.querySelectorAll("[data-t]").forEach((el) => { el.textContent = t(el.dataset.t); });
+  $("langBtn").textContent = lang === "ar" ? "EN" : "عربي";
+  $("runLabel").textContent = running ? t("running") : done ? t("finished") : $("runLabel").textContent;
+  renderCounts(); renderHistory();
+}
+$("langBtn").onclick = () => { lang = lang === "ar" ? "en" : "ar"; localStorage.setItem("mm_lang", lang); applyLang(); if (done) renderAttention(); };
+
+// ---------- state ----------
+let running = false, done = false, rows = [], counts = { PASS: 0, WARN: 0, FAIL: 0, SKIP: 0 }, outDir = "", startAt = 0, clockT = null, curSec = null, es = null, hist = [], lastSummary = null;
+
+function renderCounts() {
+  const n = counts.PASS + counts.WARN + counts.FAIL + counts.SKIP;
+  $("counts").innerHTML = ["PASS", "WARN", "FAIL", "SKIP"].map((l) => `<span class="pill ${l}">${t(l)} ${counts[l]}</span>`).join("") + `<span class="pill T">${t("total")} ${n}</span>`;
+}
+function setRunning(v) {
+  running = v;
+  $("goBtn").hidden = v; $("stopBtn").hidden = !v; $("bar").classList.toggle("off", !v);
+  if (v) $("runLabel").textContent = t("running");
+  document.querySelectorAll("#formCard input,#formCard select").forEach((e) => { e.disabled = v; });
+}
+function reset() {
+  rows = []; counts = { PASS: 0, WARN: 0, FAIL: 0, SKIP: 0 }; done = false; curSec = null; lastSummary = null;
+  $("results").innerHTML = ""; $("log").textContent = ""; $("status").textContent = ""; $("sum").hidden = true; $("attn").hidden = true; $("doneBtns").hidden = true; $("copyMsg").textContent = "";
+  $("live").hidden = false; renderCounts();
+}
+function addSection(title) {
+  const d = document.createElement("details"); d.className = "sec"; d.open = true;
+  d.innerHTML = `<summary dir="auto">${esc(title)}</summary>`;
+  $("results").appendChild(d); curSec = d;
+}
+function addRow(r) {
+  if (!curSec) addSection("");
+  rows.push({ ...r, section: curSec.firstChild.textContent });
+  counts[r.level] = (counts[r.level] || 0) + 1; renderCounts();
+  const shot = r.shot && outDir ? ` <a href="/reports/${esc(outDir)}/${esc(r.shot)}" target="_blank">&#128247;</a>` : "";
+  const hint = hintFor(r);
+  const el = document.createElement("div"); el.className = `row lvl-${r.level}`;
+  el.innerHTML = `<span class="badge">${t(r.level)}</span><div class="rc"><div class="nm" dir="auto">${esc(r.name)}${shot}</div>${r.detail ? `<div class="dt" dir="auto">${esc(r.detail)}</div>` : ""}${hint ? `<div class="hint">&#128161; ${esc(hint)}</div>` : ""}</div>`;
+  curSec.appendChild(el);
+  if (r.level === "FAIL") curSec.open = true;
+  el.scrollIntoView({ block: "nearest" });
+}
+function renderAttention() {
+  const bad = rows.filter((r) => r.level === "FAIL").concat(rows.filter((r) => r.level === "WARN"));
+  if (!bad.length) { $("attn").hidden = true; return; }
+  $("attn").hidden = false;
+  $("attn").innerHTML = `<h2>${t("attention")}</h2>` + bad.map((r) => { const h = hintFor(r); return `<div class="row lvl-${r.level}" style="border-top:0;padding:5px 0"><span class="badge">${t(r.level)}</span><div class="rc"><div class="nm" dir="auto">${esc(r.name)}</div><div class="dt" dir="auto">${esc(r.detail)}</div>${h ? `<div class="hint">&#128161; ${esc(h)}</div>` : ""}</div></div>`; }).join("");
+}
+function finish(summary) {
+  $("status").textContent = ""; done = true; lastSummary = summary; clearInterval(clockT); $("runLabel").textContent = t("finished");
+  const k = summary.fail ? "bad" : summary.warn ? "w" : "ok";
+  const key = summary.fail ? "bad" : summary.warn ? "warn" : "ok";
+  $("sum").hidden = false; $("sum").className = "sum " + k;
+  $("sum").innerHTML = `<h2>${t(key + "T")}</h2><div>${t(key + "D")}</div>`;
+  renderAttention();
+  $("doneBtns").hidden = false; $("reportLink").href = `/reports/${outDir}/report.html`;
+}
+function copyText() {
+  const s = lastSummary || {};
+  const head = `Noctua check: ${s.pass ?? counts.PASS} pass, ${s.warn ?? counts.WARN} warn, ${s.fail ?? counts.FAIL} fail, ${s.skip ?? counts.SKIP} skip`;
+  const lines = rows.filter((r) => r.level !== "PASS").map((r) => `[${r.level}] ${r.section} | ${r.name}${r.detail ? " -> " + r.detail : ""}`);
+  return [head, ...lines].join("\n");
+}
+$("copyBtn").onclick = async () => {
+  const txt = copyText();
+  try { await navigator.clipboard.writeText(txt); } catch { const a = document.createElement("textarea"); a.value = txt; document.body.appendChild(a); a.select(); document.execCommand("copy"); a.remove(); }
+  $("copyMsg").textContent = t("copied");
+};
+function tick() { const s = Math.floor((Date.now() - startAt) / 1000); $("clock").textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; }
+
+function onEvent(ev) {
+  if (ev.type === "start") { reset(); outDir = ev.out; startAt = ev.at; clearInterval(clockT); clockT = setInterval(tick, 1000); tick(); setRunning(true); $("live").scrollIntoView({ behavior: "smooth", block: "start" }); }
+  else if (ev.type === "section") addSection(ev.title);
+  else if (ev.type === "row") addRow(ev);
+  else if (ev.type === "done") finish(ev.summary);
+  else if (ev.type === "status") $("status").textContent = ev.text || "";
+  else if (ev.type === "log") { $("log").textContent += ev.line + "\n"; }
+  else if (ev.type === "exit") {
+    clearInterval(clockT); setRunning(false);
+    if (!done) { $("runLabel").textContent = t(ev.killed ? "stopped" : "crashed"); $("sum").hidden = false; $("sum").className = "sum bad"; $("sum").innerHTML = `<h2>${t(ev.killed ? "stopped" : "crashed")}</h2>`; }
+    if (es) { es.close(); es = null; }
+    loadState(false);
+  }
+}
+function connect() { if (es) es.close(); es = new EventSource("/api/events"); es.onmessage = (m) => onEvent(JSON.parse(m.data)); }
+
+// ---------- form ----------
+const val = (id) => $(id).value.trim();
+$("goBtn").onclick = async () => {
+  $("err").textContent = "";
+  const body = { site: val("site"), api: $("api").checked, ui: $("ui").checked, bench: $("bench").checked, token: val("token"), groqKey: val("groqKey"), geminiKey: val("geminiKey"), remember: $("remember").checked, quick: $("quick").checked, light: $("light").checked, headed: $("headed").checked, expect: $("expect").value, maxClicks: val("maxClicks"), models: val("models") };
+  if (!body.api && !body.ui && !body.bench) { $("err").textContent = t("needOne"); return; }
+  let r; try { r = await fetch("/api/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); } catch { $("err").textContent = mt("lost"); return; }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { $("err").textContent = j.error || "Error"; return; }
+  ["token", "groqKey", "geminiKey"].forEach((id) => { if ($("remember").checked) { $(id).value = ""; } });
+  connect();
+};
+$("stopBtn").onclick = () => fetch("/api/stop", { method: "POST" });
+$("forget").onclick = async () => { await fetch("/api/forget", { method: "POST" }); $("remember").checked = false; loadState(false); };
+
+function fmtDir(d) { const m = String(d).match(/(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})/); return m ? `${m[1]} ${m[2]}:${m[3]}` : d; }
+function renderHistory() {
+  $("hist").innerHTML = hist.length ? hist.map((h) => `<div class="hist"><span class="sp">${esc(fmtDir(h.dir))}  ${esc(h.site)}</span><span class="pill PASS">${h.pass}</span><span class="pill WARN">${h.warn}</span><span class="pill FAIL">${h.fail}</span><a target="_blank" href="/reports/${esc(h.dir)}/report.html">${t("open")}</a></div>`).join("") : `<div class="help">${t("noHist")}</div>`;
+}
+async function loadState(fill) {
+  const s = await (await fetch("/api/state")).json();
+  hist = s.history; renderHistory();
+  $("pwBanner").hidden = s.playwright;
+  $("forget").hidden = !(s.saved.token || s.saved.groqKey || s.saved.geminiKey);
+  if (fill) {
+    if (s.form) { $("site").value = s.form.site || ""; ["api", "ui", "bench", "quick", "light", "headed"].forEach((k) => { $(k).checked = !!s.form[k]; }); $("maxClicks").value = s.form.maxClicks || ""; $("models").value = s.form.models || ""; $("expect").value = s.form.expect || ""; }
+    $("remember").checked = s.remember;
+    const ph = lang === "ar" ? "محفوظ على الجهاز" : "saved on this computer";
+    if (s.saved.token) $("token").placeholder = ph; if (s.saved.groqKey) $("groqKey").placeholder = ph; if (s.saved.geminiKey) $("geminiKey").placeholder = ph;
+    if (s.running) { setRunning(true); $("live").hidden = false; connect(); }
+  }
+}
+setInterval(() => fetch("/api/ping").catch(() => {}), 5000); fetch("/api/ping").catch(() => {});
+
+// ---------- monitor ----------
+const MT = {
+  ar: { title: "المراقبة المستمرة", help: "نوكتوا يفحص مواقعك بجدول زمني ويبعتلك تنبيه لما موقع يقع. الفحص الخفيف: شغال؟ سريع؟ الشهادة؟ والعميق: اختبار نوكتوا الكامل بالمتصفح. نوكتوا بيفضل شغال في الخلفية لما تقفل النافذة (الأيقونة جنب الساعة)، ولو عاوز توقفه خالص اختار «خروج» من قايمة الأيقونة.", add: "إضافة موقع للمراقبة", url: "عنوان الموقع", name: "الاسم (اختياري)", light: "الفحص الخفيف كل (دقيقة)", deep: "الفحص العميق كل (دقيقة، 0 = إيقاف)", deepH: "ابدأ بـ 0 أو 60 أو أكتر. الفحص العميق بيستخدم المتصفح وطلبات AI حقيقية.", addBtn: "ابدأ المراقبة", al: "التنبيهات", alH: "تنبيه لما موقع يفشل فحصين ورا بعض، ولما يرجع. القيم محفوظة على جهازك فقط.", save: "حفظ", test: "جرّب تنبيه", saved: "اتحفظ", none: "ما فيش مواقع تحت المراقبة لسه.", up: "شغال", down: "واقع", wait: "في الانتظار", probe: "افحص الآن", deepNow: "عميق الآن", rm: "حذف", uptime: "التوفر", avg: "متوسط الرد", ssl: "الشهادة", days: "يوم", deepLast: "آخر فحص عميق", open: "افتح", running: "شغال دلوقتي…", off: "متوقف", pause: "إيقاف", resume: "تشغيل", sure: "تحذف المراقبة؟", lost: "الاتصال بنوكتوا انقطع. اقفل نوكتوا من أيقونة الساعة (خروج) وافتحه من جديد.", alertsOn: "التنبيهات مفعّلة", alertsOff: "مفيش تنبيهات مفعّلة" },
+  en: { title: "Continuous monitoring", help: "Noctua checks your sites on a schedule and alerts you when one goes down. Light check: up, fast, certificate. Deep check: the full Noctua browser test. Noctua keeps running in the background when you close the window (tray icon near the clock). To stop it completely, choose Quit from the tray menu.", add: "Add a site to monitor", url: "Site address", name: "Name (optional)", light: "Light check every (min)", deep: "Deep check every (min, 0 = off)", deepH: "Start with 0, or 60 and up. The deep check uses the browser and real AI calls.", addBtn: "Start monitoring", al: "Alerts", alH: "Alert when a site fails two checks in a row, and when it recovers. Values are saved on this computer only.", save: "Save", test: "Send test alert", saved: "Saved", none: "No sites monitored yet.", up: "UP", down: "DOWN", wait: "waiting", probe: "Check now", deepNow: "Deep now", rm: "Remove", uptime: "Uptime", avg: "Avg response", ssl: "Certificate", days: "days", deepLast: "Last deep check", open: "open", running: "running…", off: "paused", pause: "Pause", resume: "Resume", sure: "Remove this monitor?", lost: "Lost the connection to Noctua. Quit it from the tray icon and open it again.", alertsOn: "Alerts are on", alertsOff: "No alerts configured" },
+};
+const mt = (k) => MT[lang][k] ?? k;
+let mState = { sites: [], alerts: {} }; window.mState = mState;
+const post = async (u, b) => { const r = await fetch(u, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b || {}) }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || "Error"); return j; };
+function spark(series) {
+  if (!series.length) return "";
+  if (series.length === 1) return `<svg width="230" height="38" style="direction:ltr"><circle cx="6" cy="19" r="4" fill="${series[0].ok ? "var(--pass)" : "var(--fail)"}"/></svg>`;
+  const W = 230, H = 38, max = Math.max(500, ...series.map((x) => x.ms)), step = W / Math.max(1, series.length - 1);
+  const pts = series.map((x, i) => `${(i * step).toFixed(1)},${(H - 3 - (x.ms / max) * (H - 6)).toFixed(1)}`).join(" ");
+  const dots = series.map((x, i) => (x.ok ? "" : `<circle cx="${(i * step).toFixed(1)}" cy="${H - 3}" r="3" fill="var(--fail)"/>`)).join("");
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="direction:ltr"><polyline fill="none" stroke="var(--ac)" stroke-width="1.5" points="${pts}"/>${dots}</svg>`;
+}
+const ago = (ts) => { const s = Math.max(0, Math.round((Date.now() - ts) / 1000)); return s < 90 ? `${s}s` : s < 5400 ? `${Math.round(s / 60)}m` : `${Math.round(s / 3600)}h`; };
+function renderMon() {
+  const EXTRA = { ar: { tWatch: "المراقبة", tTest: "الاختبار", tLog: "السجل", incT: "اللي حصل", incNone: "مفيش أحداث لسه. أي وقوع أو رجوع لموقع هيظهر هنا.", down: "وقع", up: "رجع", changed: "المحتوى اتغيّر", deep: "الفحص العميق لقى أخطاء", addPh: "https://your-site.com" }, en: { tWatch: "Watch", tTest: "Test", tLog: "Log", incT: "What happened", incNone: "Nothing yet. Every outage and recovery will show up here.", down: "went down", up: "came back", changed: "content changed", deep: "deep check found failures", addPh: "https://your-site.com" } }[lang];
+  $("tabWatch").textContent = EXTRA.tWatch; $("tabTest").textContent = EXTRA.tTest; $("tabLog").textContent = EXTRA.tLog; $("incT").textContent = EXTRA.incT;
+  $("mTitle").textContent = mt("title"); $("mHelp").textContent = mt("help"); $("mAddT").textContent = mt("add");
+  $("mUrlL").textContent = mt("url"); $("mNameL").textContent = mt("name"); $("mLightL").textContent = mt("light"); $("mDeepL").textContent = mt("deep"); $("mDeepH").textContent = mt("deepH"); $("mAddBtn").textContent = mt("addBtn");
+  $("quitBtn").textContent = lang === "ar" ? "إغلاق نوكتوا بالكامل" : "Quit Noctua completely";
+  $("mAlT").textContent = mt("al") + " — " + (mState.alerts.telegram || mState.alerts.webhook ? mt("alertsOn") : mt("alertsOff")); $("mAlH").textContent = mt("alH"); $("aSave").textContent = mt("save"); $("aTest").textContent = mt("test");
+  $("mList").innerHTML = mState.sites.length ? mState.sites.map((s) => {
+    const l = s.last, lv = s.level || "wait", cls = lv === "nonet" ? "off nonet" : lv === "wait" ? "off" : lv, d = s.lastDeep;
+    const label = { up: mt("up"), warn: vt("lvWarn"), down: mt("down"), off: mt("off"), wait: mt("wait"), nonet: vt("lvNonet") }[lv];
+    const deep = s.deepMin || d ? `<div class="deepline"><span>${mt("deepLast")}:</span>${s.deepRunning ? mt("running") : d ? `<span class="pill PASS">${d.pass}</span><span class="pill WARN">${d.warn}</span><span class="pill FAIL">${d.fail}</span><span>${ago(d.t)}</span>${d.report ? `<a target="_blank" href="/api/monitor/deep-report/${encodeURI(s.id + "/" + d.report.split("/").slice(1).join("/"))}">${mt("open")}</a>` : ""}` : "-"}</div>` : "";
+    const strip = (s.strip || []).length ? `<div class="strip" title="${esc(vt("stripT"))}">${s.strip.map((c) => `<i class="${c === 0 ? "g" : c === 1 ? "y" : c === 2 ? "r" : ""}"></i>`).join("")}</div>` : "";
+    return `<div class="wrow ${cls}"><i class="dot"></i>
+      <div class="who"><button type="button" class="lnk" data-a="open" data-id="${esc(s.id)}">${esc(s.name)}</button><span class="url">${esc(s.url)}</span><span class="st">${label}${l ? " · " + ago(l.t) : ""}</span>${l && l.notes && l.notes.length ? `<span class="note">${esc(l.notes.join(" · "))}</span>` : ""}</div>
+      <div class="spk">${spark(s.series)}</div>
+      <dl class="nums"><div><dt>${vt("up24")}</dt><dd>${s.w24 ? s.w24.up : "-"}%</dd></div><div><dt>${mt("avg")}</dt><dd>${s.w24 && s.w24.avg != null ? s.w24.avg : "-"} ms</dd></div><div><dt>${mt("ssl")}</dt><dd>${l && l.ssl !== null && l.ssl !== undefined ? l.ssl + " " + mt("days") : "-"}</dd></div></dl>
+      <div class="acts"><button type="button" data-a="open" data-id="${esc(s.id)}">${vt("details")}</button><button type="button" data-a="probe" data-id="${esc(s.id)}">${mt("probe")}</button><button type="button" data-a="deep" data-id="${esc(s.id)}">${mt("deepNow")}</button><button type="button" data-a="toggle" data-id="${esc(s.id)}">${s.enabled ? mt("pause") : mt("resume")}</button><button type="button" data-a="rm" data-id="${esc(s.id)}">${mt("rm")}</button></div>${strip}${deep}</div>`;
+  }).join("") : `<div class="help" style="padding:22px 6px">${mt("none")}</div>`;
+  const inc = mState.incidents || [];
+  $("incList").innerHTML = inc.length ? inc.map((e) => `<div class="ev ${e.type}"><time>${new Date(e.t).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</time><b>${esc(e.site)}</b> ${EXTRA[e.type]}${e.dur ? " · " + fmtDur(e.dur) : ""}${e.note ? `<div class="help">${esc(e.note)}</div>` : ""}</div>`).join("") : `<div class="help">${EXTRA.incNone}</div>`;
+  $("mUrl").placeholder = EXTRA.addPh;
+  renderViews();
+}
+// ---------- monitor screens: overview, one site in detail, this computer ----------
+const VT = {
+  ar: {
+    sOver: "نظرة عامة", sSite: "تفاصيل موقع", sDev: "الجهاز والإنترنت",
+    details: "تفاصيل", stripT: "آخر 24 ساعة: أخضر سليم، برتقالي فيه أعطال، أحمر واقع", up24: "التوفر 24 ساعة",
+    lvWarn: "شغال بتحذير", lvNonet: "الإنترنت عندك مقطوع",
+    sumUp: "المواقع الشغالة", sum24: "التوفر خلال 24 ساعة", sumAvg: "متوسط الرد", sumNet: "الإنترنت عندك", netOn: "شغال", netOff: "مقطوع", netWait: "بيتفحص",
+    vAllUp: "كل المواقع شغالة.", vDown: "{0} واقع دلوقتي.", vWarn: "{0} شغال بس فيه تحذيرات.", vNone: "ضيف أول موقع عشان تبدأ المراقبة.", vNoNet: "الإنترنت على الجهاز ده مقطوع، فالفحص متوقف ومش هيتحسب وقوع.", vWaiting: "بيجهّز أول فحص…",
+    pickNone: "ما فيش مواقع. ضيف موقع من «نظرة عامة».", checked: "آخر فحص", never: "لسه ما اتفحصش", next: "الفحص الجاي بعد", probing: "بيفحص…", checkNow: "افحص الآن",
+    wfT: "رحلة الطلب (آخر فحص)", dns: "ترجمة الاسم DNS", tcp: "الاتصال", tls: "تشفير TLS", wait: "انتظار السيرفر", dl: "التحميل", total: "الإجمالي",
+    failAt: "الفحص فشل عند مرحلة:", stDns: "ترجمة الاسم", stConnect: "الاتصال", stTls: "تشفير TLS", stWait: "رد السيرفر", stDownload: "التحميل",
+    chartT: "سرعة الرد", h1: "ساعة", h24: "24 ساعة", noData: "ما فيش بيانات كفاية لسه. الرسم هيتملي مع كل فحص.", p95: "p95",
+    winT: "التوفر والسرعة", wLast1: "آخر ساعة", wLast24: "آخر 24 ساعة", w7: "آخر 7 أيام", w30: "آخر 30 يوم", cUp: "التوفر", cAvg: "المتوسط", cP95: "أبطأ 5%", cN: "فحوصات", cMax: "الأعلى",
+    factsT: "إيه اللي شفناه", fIp: "عنوان السيرفر IP", fStatus: "حالة HTTP", fProto: "بروتوكول التشفير", fServer: "السيرفر", fType: "نوع المحتوى", fSize: "حجم الصفحة", fRedir: "التحويلات", fFinal: "العنوان النهائي", fTitle: "عنوان الصفحة", fCert: "الشهادة تنتهي بعد", fIssuer: "الجهة المصدّرة", fMttr: "متوسط وقت الإصلاح", fStored: "فحوصات محفوظة", fDays: "يوم", none: "-",
+    secT: "رؤوس الحماية", secNote: "معلومة فقط، مش بتغيّر حالة الموقع.", hsts: "HSTS", csp: "CSP", xfo: "X-Frame-Options", xcto: "nosniff", ref: "Referrer-Policy", present: "موجود", missing: "ناقص",
+    pagesT: "صفحات إضافية", pagesNone: "ما فيش صفحات إضافية. ضيف مسارات زي /api/health من «إعدادات الموقع» تحت وهتتفحص مع كل فحص.", cPath: "المسار", cStatus: "الحالة", cMs: "الرد",
+    contentT: "المحتوى", kwLine: "الكلمة المطلوبة", kwFound: "ظاهرة في الصفحة", kwMissing: "مش ظاهرة", kwNone: "ما اتحددتش", chgNone: "ما لاحظناش تغيّر في المحتوى لسه.", chgHelp: "بنقارن نص الصفحة وملفاتها في كل فحص.",
+    evT: "أحداث الموقع", evNone: "مفيش أحداث لسه.", evDown: "وقع", evUp: "رجع بعد", evChanged: "المحتوى اتغيّر", evDeep: "الفحص العميق لقى أخطاء",
+    recT: "آخر الفحوصات", cTime: "الوقت", cOk: "النتيجة", cNote: "ملاحظات", okT: "سليم", warnT: "تحذير", downT: "واقع",
+    setT: "إعدادات الموقع", sName: "الاسم", sLight: "الفحص كل (دقيقة)", sSlow: "أبطأ رد مقبول (ملّي ثانية)", sDeep: "الفحص العميق كل (دقيقة، 0 = إيقاف)", sKw: "كلمة لازم تظهر في الصفحة", sTok: "رمز الأدمن للفحص العميق (اتركه فاضي ليفضل زي ما هو)", sPaths: "صفحات إضافية للفحص (مسار في كل سطر)", sWatch: "نبّهني لو محتوى الصفحة اتغيّر", sSave: "حفظ الإعدادات", sSaved: "اتحفظ",
+    netT: "الإنترنت على الجهاز ده", netOk: "الإنترنت شغال", netBad: "الإنترنت مقطوع", netWhy: "لو الإنترنت مقطوع، نوكتوا مش بيحسبه وقوع للموقع ومش بيبعت تنبيه. بنجرّب Google وCloudflare وMicrosoft كل دقيقة.", netCheck: "افحص الآن", netDns: "سرعة DNS", netTarget: "نقطة الاختبار", netLog: "آخر دقايق", netChecked: "آخر فحص",
+    pcT: "الجهاز", pcCpu: "المعالج", pcRam: "الذاكرة", pcUp: "الجهاز شغال من", pcOs: "النظام", pcCores: "الأنوية",
+    appT: "نوكتوا نفسه", aUp: "شغال من", aMem: "الذاكرة المستخدمة", aProbes: "فحوصات من ساعة التشغيل", aFailed: "منها فشلت", aLag: "تأخير الجدولة", aData: "حجم البيانات المحفوظة", aSites: "المواقع النشطة", aDeep: "فحوصات عميقة شغالة", aSched: "الجدولة", schedOn: "شغالة", schedOff: "واقفة",
+    alT: "التنبيهات", alTg: "تيليجرام", alWh: "Webhook", alOn: "مفعّل", alOff: "مش مفعّل", alLog: "آخر تنبيهات اتبعتت", alNone: "ما اتبعتش تنبيه لسه.", loading: "بيحمّل…",
+  },
+  en: {
+    sOver: "Overview", sSite: "Site details", sDev: "This computer",
+    details: "Details", stripT: "Last 24 hours: green healthy, orange some failures, red down", up24: "Uptime 24h",
+    lvWarn: "UP with warnings", lvNonet: "No internet here",
+    sumUp: "Sites up", sum24: "Uptime, 24 hours", sumAvg: "Avg response", sumNet: "Your internet", netOn: "online", netOff: "offline", netWait: "checking",
+    vAllUp: "Every site is up.", vDown: "{0} down right now.", vWarn: "{0} up, with warnings.", vNone: "Add your first site to start watching.", vNoNet: "This computer has no internet, so checks are paused and nothing counts as an outage.", vWaiting: "Preparing the first check…",
+    pickNone: "No sites yet. Add one from Overview.", checked: "Last check", never: "Not checked yet", next: "Next check in", probing: "Checking…", checkNow: "Check now",
+    wfT: "Where the time went (last check)", dns: "DNS lookup", tcp: "Connect", tls: "TLS", wait: "Server wait", dl: "Download", total: "Total",
+    failAt: "The check failed at:", stDns: "DNS lookup", stConnect: "Connect", stTls: "TLS", stWait: "Server reply", stDownload: "Download",
+    chartT: "Response time", h1: "1h", h24: "24h", noData: "Not enough data yet. The chart fills in with every check.", p95: "p95",
+    winT: "Uptime and speed", wLast1: "Last hour", wLast24: "Last 24 hours", w7: "Last 7 days", w30: "Last 30 days", cUp: "Uptime", cAvg: "Average", cP95: "Slowest 5%", cN: "Checks", cMax: "Max",
+    factsT: "What we saw", fIp: "Server IP", fStatus: "HTTP status", fProto: "TLS version", fServer: "Server", fType: "Content type", fSize: "Page size", fRedir: "Redirects", fFinal: "Final address", fTitle: "Page title", fCert: "Certificate expires in", fIssuer: "Issued by", fMttr: "Mean time to recover", fStored: "Checks stored", fDays: "days", none: "-",
+    secT: "Security headers", secNote: "Information only. Doesn't change the site's status.", hsts: "HSTS", csp: "CSP", xfo: "X-Frame-Options", xcto: "nosniff", ref: "Referrer-Policy", present: "present", missing: "missing",
+    pagesT: "Extra pages", pagesNone: "No extra pages. Add paths like /api/health under Site settings below and they are checked every time.", cPath: "Path", cStatus: "Status", cMs: "Time",
+    contentT: "Content", kwLine: "Required text", kwFound: "found on the page", kwMissing: "not on the page", kwNone: "not set", chgNone: "No content change noticed yet.", chgHelp: "We compare the page text and its files on every check.",
+    evT: "Site events", evNone: "No events yet.", evDown: "went down", evUp: "came back after", evChanged: "content changed", evDeep: "deep check found failures",
+    recT: "Recent checks", cTime: "Time", cOk: "Result", cNote: "Notes", okT: "OK", warnT: "Warning", downT: "Down",
+    setT: "Site settings", sName: "Name", sLight: "Check every (min)", sSlow: "Slowest acceptable response (ms)", sDeep: "Deep check every (min, 0 = off)", sKw: "Text that must appear on the page", sTok: "Admin token for the deep check (leave empty to keep it)", sPaths: "Extra pages to check (one path per line)", sWatch: "Alert me when the page content changes", sSave: "Save settings", sSaved: "Saved",
+    netT: "Internet on this computer", netOk: "Internet is working", netBad: "Internet is down", netWhy: "While the internet is down Noctua doesn't count it as a site outage and sends no alert. It tries Google, Cloudflare and Microsoft every minute.", netCheck: "Check now", netDns: "DNS speed", netTarget: "Test point", netLog: "Last minutes", netChecked: "Last check",
+    pcT: "This computer", pcCpu: "Processor", pcRam: "Memory", pcUp: "Up for", pcOs: "System", pcCores: "Cores",
+    appT: "Noctua itself", aUp: "Running for", aMem: "Memory used", aProbes: "Checks since start", aFailed: "of them failed", aLag: "Scheduler delay", aData: "Saved data", aSites: "Active sites", aDeep: "Deep checks running", aSched: "Scheduler", schedOn: "running", schedOff: "stopped",
+    alT: "Alerts", alTg: "Telegram", alWh: "Webhook", alOn: "on", alOff: "off", alLog: "Recent alerts sent", alNone: "No alert sent yet.", loading: "Loading…",
+  },
+};
+const vt = (k, ...a) => { let s = VT[lang][k] ?? k; a.forEach((x, i) => { s = s.replace("{" + i + "}", x); }); return s; };
+const V = (x) => `<span class="v">${esc(x)}</span>`;
+const fmtT = (t) => new Date(t).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+const fmtHM = (t) => new Date(t).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+const fmtDur = (ms) => { const s = Math.round(ms / 1000); if (s < 90) return s + "s"; const m = Math.round(s / 60); if (m < 90) return m + "m"; const h = Math.floor(m / 60); if (h < 48) return h + "h " + (m % 60) + "m"; return Math.floor(h / 24) + "d " + (h % 24) + "h"; };
+const fmtMs = (n) => (n == null ? "-" : n >= 10000 ? Math.round(n / 1000) + " s" : n >= 1000 ? (n / 1000).toFixed(1) + " s" : n + " ms");
+const fmtB = (n) => (n == null ? "-" : n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(1) + " KB" : n < 1073741824 ? (n / 1048576).toFixed(1) + " MB" : (n / 1073741824).toFixed(1) + " GB");
+const lvLabel = (lv) => ({ up: mt("up"), warn: vt("lvWarn"), down: mt("down"), off: mt("off"), wait: mt("wait"), nonet: vt("lvNonet") }[lv] || lv);
+
+let sub = "over", curId = null, detail = null, sysData = null, chartH = 24;
+function renderSubnav() {
+  document.querySelectorAll("#subnav button").forEach((b) => { b.textContent = vt({ over: "sOver", site: "sSite", dev: "sDev" }[b.dataset.sub]); b.setAttribute("aria-selected", String(b.dataset.sub === sub)); });
+  document.querySelectorAll("[data-sub-panel]").forEach((p) => { p.hidden = p.dataset.subPanel !== sub; });
+}
+function showSub(n) {
+  sub = n; try { localStorage.setItem("mm_sub", n); } catch { /* private mode */ }
+  if (n === "site" && !curId && mState.sites.length) { curId = mState.sites[0].id; fillSettings(); }
+  renderSubnav(); renderViews(); refreshView();
+}
+document.querySelectorAll("#subnav button").forEach((b) => { b.onclick = () => showSub(b.dataset.sub); });
+function openSite(id) { curId = id; detail = null; fillSettings(); showSub("site"); }
+function refreshView() { if (sub === "site") loadDetail(); else if (sub === "dev") loadSys(false); }
+async function loadDetail() {
+  if (!curId) return;
+  try { const r = await fetch("/api/monitor/detail?id=" + encodeURIComponent(curId)); if (r.status === 404) { curId = null; detail = null; renderSite(); return; } detail = await r.json(); renderSite(); } catch { /* keep the last view */ }
+}
+async function loadSys(force) {
+  try { sysData = force ? await post("/api/monitor/net-check") : await (await fetch("/api/monitor/system")).json(); renderDev(); } catch { /* keep the last view */ }
+}
+setInterval(() => { if (!document.hidden) refreshView(); }, 6000);
+function renderViews() { renderSubnav(); renderSummary(); renderSite(); renderDev(); }
+
+function renderSummary() {
+  const ss = mState.sites.filter((s) => s.enabled), n = ss.length;
+  const upN = ss.filter((s) => s.level === "up" || s.level === "warn").length, downN = ss.filter((s) => s.level === "down").length, warnN = ss.filter((s) => s.level === "warn").length, waitN = ss.filter((s) => s.level === "wait").length;
+  const w = ss.map((s) => s.w24).filter(Boolean), tn = w.reduce((a, x) => a + x.n, 0);
+  const up24 = tn ? Math.round(w.reduce((a, x) => a + x.up * x.n, 0) / tn * 100) / 100 : null;
+  const avgs = w.filter((x) => x.avg != null), avg = avgs.length ? Math.round(avgs.reduce((a, x) => a + x.avg, 0) / avgs.length) : null;
+  const net = mState.net || {}, netCls = net.ok === false ? "bad" : net.ok ? "good" : "", netTxt = net.ok === false ? vt("netOff") : net.ok ? vt("netOn") : vt("netWait");
+  const names = ss.filter((s) => s.level === "down").map((s) => s.name).join("، ");
+  let verdict = "", vc = "good";
+  if (!mState.sites.length) { verdict = vt("vNone"); vc = ""; }
+  else if (net.ok === false && ss.some((s) => s.level === "nonet")) { verdict = vt("vNoNet"); vc = "mid"; }
+  else if (downN) { verdict = vt("vDown", names || downN); vc = "bad"; }
+  else if (warnN) { verdict = vt("vWarn", ss.filter((s) => s.level === "warn").map((s) => s.name).join("، ")); vc = "mid"; }
+  else if (waitN && waitN === n) { verdict = vt("vWaiting"); vc = ""; }
+  else if (n) verdict = vt("vAllUp");
+  $("mSum").innerHTML = mState.sites.length ? `<dl class="sumstrip"><div><dt>${vt("sumUp")}</dt><dd class="${downN ? "bad" : n && upN === n ? "good" : ""}">${V(upN + " / " + n)}</dd></div><div><dt>${vt("sum24")}</dt><dd class="${up24 === null ? "" : up24 < 99 ? (up24 < 95 ? "bad" : "mid") : "good"}">${V(up24 === null ? "-" : up24 + "%")}</dd></div><div><dt>${vt("sumAvg")}</dt><dd>${V(fmtMs(avg))}</dd></div><div><dt>${vt("sumNet")}</dt><dd class="${netCls}">${netTxt}</dd></div></dl><p class="verdict ${vc}">${esc(verdict)}</p>` : "";
+}
+
+// ----- charts -----
+function rtChart(b, p95) {
+  const W = 640, H = 160, L = 46, R = 8, T = 10, B = 24, w = W - L - R, h = H - T - B;
+  const vals = b.filter((x) => x.ms != null).map((x) => x.ms);
+  if (!vals.length && !b.some((x) => x.bad)) return `<div class="help">${vt("noData")}</div>`;
+  const max = Math.max(300, ...vals) * 1.1, n = b.length, step = w / n, X = (i) => L + i * step + step / 2, Y = (v) => T + h - (v / max) * h;
+  let bands = "", line = "", seg = [];
+  const flush = () => { if (seg.length === 1) { const [x, y] = seg[0].split(","); line += `<circle cx="${x}" cy="${y}" r="2.5" fill="var(--ac)"/>`; } else if (seg.length > 1) line += `<polyline fill="none" stroke="var(--ac)" stroke-width="1.6" points="${seg.join(" ")}"/>`; seg = []; };
+  b.forEach((x, i) => { if (x.bad) bands += `<rect x="${(L + i * step).toFixed(1)}" y="${T}" width="${step.toFixed(1)}" height="${h}" fill="var(--fail)" opacity="${(0.2 + 0.4 * x.bad / Math.max(1, x.n)).toFixed(2)}"/>`; if (x.ms != null) seg.push(`${X(i).toFixed(1)},${Y(x.ms).toFixed(1)}`); else flush(); });
+  flush();
+  const grid = [0, 0.5, 1].map((f) => { const y = T + h - f * h; return `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" stroke="#1f1f1f"/><text x="${L - 6}" y="${y + 4}" text-anchor="end" font-size="11" fill="#8d897d">${fmtMs(Math.round(max * f / 10) * 10)}</text>`; }).join("");
+  const pl = p95 != null && p95 < max ? `<line x1="${L}" x2="${W - R}" y1="${Y(p95)}" y2="${Y(p95)}" stroke="var(--warn)" stroke-dasharray="4 4" opacity=".7"/><text x="${W - R}" y="${Y(p95) - 4}" text-anchor="end" font-size="11" fill="var(--warn)">${vt("p95")}</text>` : "";
+  const t0 = b[0].t, t1 = b[n - 1].t + (b[1] ? b[1].t - b[0].t : 0), long = t1 - t0 >= 20 * 3600e3;
+  const lbl = (t) => long ? new Date(t).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : fmtHM(t);
+  const xl = [0, 0.25, 0.5, 0.75, 1].map((f) => `<text x="${(L + f * w).toFixed(1)}" y="${H - 6}" text-anchor="${f === 0 ? "start" : f === 1 ? "end" : "middle"}" font-size="11" fill="#8d897d" style="direction:ltr">${lbl(t0 + f * (t1 - t0))}</text>`).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(vt("chartT"))}">${grid}${bands}${pl}${line}${xl}</svg>`;
+}
+function miniLine(arr, max, color) {
+  if (!arr || arr.length < 2) return "";
+  const W = 260, H = 36, step = W / (arr.length - 1), m = max || Math.max(1, ...arr);
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="direction:ltr;max-width:100%"><polyline fill="none" stroke="${color || "var(--ac)"}" stroke-width="1.5" points="${arr.map((v, i) => `${(i * step).toFixed(1)},${(H - 2 - (v / m) * (H - 4)).toFixed(1)}`).join(" ")}"/></svg>`;
+}
+
+// ----- one site in detail -----
+const PH = [["dns", "#8a5a00"], ["tcp", "#b37800"], ["tls", "#d99500"], ["wait", "#ffb000"], ["dl", "#ffe7a3"]];
+function winRow(label, w) {
+  if (!w) return `<tr><td>${label}</td><td colspan="5" class="help">-</td></tr>`;
+  const cls = w.up >= 99.9 ? "good" : w.up >= 99 ? "" : w.up >= 95 ? "mid" : "bad";
+  return `<tr><td>${label}</td><td class="ltr ${cls}">${w.up}%</td><td class="ltr">${fmtMs(w.avg)}</td><td class="ltr">${fmtMs(w.p95)}</td><td class="ltr">${fmtMs(w.max)}</td><td class="ltr">${w.n}</td></tr>`;
+}
+function renderSite() {
+  const pick = mState.sites.map((s) => `<button type="button" class="pick ${s.id === curId ? "on" : ""}" data-id="${esc(s.id)}"><i class="${s.level === "up" || s.level === "warn" || s.level === "down" ? s.level : ""}"></i>${esc(s.name)}</button>`).join("");
+  $("sitePick").innerHTML = pick; $("setBox").hidden = !curId;
+  if (!mState.sites.length) { $("siteBody").innerHTML = `<div class="help" style="padding:22px 0">${vt("pickNone")}</div>`; return; }
+  if (!detail || detail.site.id !== curId) { $("siteBody").innerHTML = `<div class="help" style="padding:22px 0">${vt("loading")}</div>`; return; }
+  const d = detail, s = d.site, l = d.last, lv = d.level;
+  let h = `<div class="shead"><div><h2>${esc(s.name)}</h2><a class="url" href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.url)}</a></div><div><span class="lvl ${lv}">${lvLabel(lv)}</span><span class="help">${l ? vt("checked") + " " + ago(l.t) : vt("never")}${s.enabled && d.nextLight ? " · " + vt("next") + " " + fmtDur(Math.max(0, d.nextLight - Date.now())) : ""}</span></div></div>`;
+  h += `<div class="btns" style="margin-top:6px"><button type="button" data-a="probe">${d.probing ? vt("probing") : vt("checkNow")}</button><button type="button" data-a="deep">${mt("deepNow")}</button><button type="button" data-a="toggle">${s.enabled ? mt("pause") : mt("resume")}</button><button type="button" data-a="rm">${mt("rm")}</button></div>`;
+  if (l && l.notes && l.notes.length) h += `<p class="note" style="margin-top:10px">${esc(l.notes.join(" · "))}</p>`;
+
+  // 1. where the time went
+  h += `<div class="blk"><h3>${vt("wfT")}</h3>`;
+  if (l && l.ph) {
+    const sum = PH.reduce((a, [k]) => a + (l.ph[k] || 0), 0) || 1;
+    h += `<div class="wf">${PH.map(([k, c]) => `<i style="flex:${Math.max(l.ph[k] || 0, sum * 0.01)} 1 0;background:${c}" title="${esc(vt(k))}: ${l.ph[k] || 0} ms"></i>`).join("")}</div><div class="wfk">${PH.map(([k, c]) => `<span><em style="background:${c}"></em>${vt(k)} <b>${l.ph[k] || 0} ms</b></span>`).join("")}<span>${vt("total")} <b>${l.ms} ms</b></span></div>`;
+  } else if (l && l.stage) {
+    const order = /^https:/i.test(s.url) ? ["dns", "connect", "tls", "wait", "download"] : ["dns", "connect", "wait", "download"], at = order.indexOf(l.stage), nm = { dns: "stDns", connect: "stConnect", tls: "stTls", wait: "stWait", download: "stDownload" };
+    h += `<p class="help">${vt("failAt")} <b style="color:var(--fail)">${vt(nm[l.stage])}</b> ${l.err ? "· " + V(l.err) : ""}</p><div class="stages">${order.map((k, i) => `<span class="${i < at ? "ok" : i === at ? "no" : ""}">${vt(nm[k])}</span>`).join("")}</div>`;
+  } else h += `<div class="help">${vt("never")}</div>`;
+  h += `</div>`;
+
+  // 2. response chart
+  const ser = chartH === 1 ? d.series1 : d.series24, wp = chartH === 1 ? d.w1 : d.w24;
+  h += `<div class="blk chart"><h3>${vt("chartT")}<span class="tog"><button type="button" data-ch="1" class="${chartH === 1 ? "on" : ""}">${vt("h1")}</button><button type="button" data-ch="24" class="${chartH === 24 ? "on" : ""}">${vt("h24")}</button></span></h3>${rtChart(ser, wp && wp.p95)}</div>`;
+
+  // 3. windows
+  h += `<div class="blk"><h3>${vt("winT")}</h3><div class="scroll"><table class="tbl"><thead><tr><th></th><th>${vt("cUp")}</th><th>${vt("cAvg")}</th><th>${vt("cP95")}</th><th>${vt("cMax")}</th><th>${vt("cN")}</th></tr></thead><tbody>${winRow(vt("wLast1"), d.w1)}${winRow(vt("wLast24"), d.w24)}${winRow(vt("w7"), d.w7)}${winRow(vt("w30"), d.w30)}</tbody></table></div></div>`;
+
+  // 4. facts + security
+  const f = (k, v) => `<div><dt>${vt(k)}</dt><dd>${v === "" || v == null ? "-" : esc(v)}</dd></div>`;
+  const cert = l && l.cert;
+  h += `<div class="blk"><h3>${vt("factsT")}</h3><dl class="facts">${f("fIp", l && l.ip)}${f("fStatus", l && l.status ? l.status : "")}${f("fProto", cert && cert.proto)}${f("fServer", l && l.server)}${f("fType", l && l.type)}${f("fSize", l && l.size != null ? fmtB(l.size) : "")}${f("fRedir", l && l.redirects != null ? l.redirects : "")}${l && l.final ? f("fFinal", l.final) : ""}${f("fTitle", l && l.title)}${f("fIssuer", cert && cert.issuer)}${f("fCert", cert ? cert.days + " " + vt("fDays") : "")}${f("fMttr", d.mttr != null ? fmtDur(d.mttr) : "")}${f("fStored", d.total)}</dl></div>`;
+  const sec = l && l.sec;
+  h += `<div class="blk"><h3>${vt("secT")}</h3>${sec ? `<div class="chips">${["hsts", "csp", "xfo", "xcto", "ref"].map((k) => `<span class="chip ${sec[k] ? "ok" : "no"}">${vt(k)} · ${sec[k] ? vt("present") : vt("missing")}</span>`).join("")}</div><p class="help">${vt("secNote")}</p>` : `<div class="help">-</div>`}</div>`;
+
+  // 5. extra pages + content
+  h += `<div class="blk"><h3>${vt("pagesT")}</h3>${l && l.paths && l.paths.length ? `<div class="scroll"><table class="tbl"><thead><tr><th>${vt("cPath")}</th><th>${vt("cStatus")}</th><th>${vt("cMs")}</th></tr></thead><tbody>${l.paths.map((x) => `<tr><td class="ltr">${esc(x.p)}</td><td class="ltr ${x.ok ? "good" : "bad"}">${x.status || esc(x.err || "-")}</td><td class="ltr">${fmtMs(x.ms)}</td></tr>`).join("")}</tbody></table></div>` : `<div class="help">${vt("pagesNone")}</div>`}</div>`;
+  const kw = s.keyword ? `<b class="${l && l.kw === false ? "bad" : ""}" style="color:var(${l && l.kw === false ? "--fail" : "--pass"})">${esc(s.keyword)} · ${l && l.kw === false ? vt("kwMissing") : l && l.kw ? vt("kwFound") : "-"}</b>` : `<span class="help">${vt("kwNone")}</span>`;
+  h += `<div class="blk"><h3>${vt("contentT")}</h3><p style="margin:0 0 8px">${vt("kwLine")}: ${kw}</p>${d.changes.length ? `<div class="tl">${d.changes.map((e) => `<div class="ev changed"><time>${fmtT(e.t)}</time>${vt("evChanged")}${e.note ? `<div class="help">${esc(e.note)}</div>` : ""}</div>`).join("")}</div>` : `<div class="help">${vt("chgNone")}</div>`}<p class="help">${vt("chgHelp")}</p></div>`;
+
+  // 6. deep check
+  const dp = d.lastDeep;
+  if (s.deepMin || dp) h += `<div class="blk"><h3>${mt("deepLast")}</h3>${d.deepRunning ? mt("running") : dp ? `<span class="pill PASS">${dp.pass}</span> <span class="pill WARN">${dp.warn}</span> <span class="pill FAIL">${dp.fail}</span> <span class="help">${ago(dp.t)}</span> ${dp.report ? `<a target="_blank" href="/api/monitor/deep-report/${encodeURI(s.id + "/" + dp.report.split("/").slice(1).join("/"))}">${mt("open")}</a>` : ""}` : "-"}</div>`;
+
+  // 7. events + recent checks
+  const ev = d.events.filter((e) => e.type !== "changed");
+  h += `<div class="blk"><h3>${vt("evT")}</h3>${ev.length ? `<div class="tl">${ev.slice(0, 15).map((e) => `<div class="ev ${e.type}"><time>${fmtT(e.t)}</time>${e.type === "down" ? vt("evDown") : e.type === "up" ? vt("evUp") + " " + V(fmtDur(e.dur)) : vt("evDeep")}${e.note ? `<div class="help">${esc(e.note)}</div>` : ""}</div>`).join("")}</div>` : `<div class="help">${vt("evNone")}</div>`}</div>`;
+  h += `<div class="blk"><h3>${vt("recT")}</h3><div class="scroll"><table class="tbl"><thead><tr><th>${vt("cTime")}</th><th>${vt("cOk")}</th><th>${vt("cMs")}</th><th>${vt("cNote")}</th></tr></thead><tbody>${d.recent.slice(0, 15).map((r) => { const c = r.noNet ? "" : r.level === "warn" ? "mid" : r.ok ? "good" : "bad"; return `<tr><td class="ltr">${fmtT(r.t)}</td><td class="${c}">${r.noNet ? vt("lvNonet") : r.level === "warn" ? vt("warnT") : r.ok ? vt("okT") : vt("downT")}${r.status ? ` <span class="v">${r.status}</span>` : ""}</td><td class="ltr">${r.ok || r.ms ? fmtMs(r.ms) : "-"}</td><td class="help">${esc((r.notes || []).join(" · "))}</td></tr>`; }).join("")}</tbody></table></div></div>`;
+  $("siteBody").innerHTML = h;
+  $("setT").textContent = vt("setT");
+}
+$("sitePick").onclick = (e) => { const b = e.target.closest("button[data-id]"); if (b) openSite(b.dataset.id); };
+$("siteBody").onclick = async (e) => {
+  const c = e.target.closest("button[data-ch]"); if (c) { chartH = Number(c.dataset.ch); renderSite(); return; }
+  const b = e.target.closest("button[data-a]"); if (!b || !curId) return; const id = curId;
+  try {
+    if (b.dataset.a === "probe") await post("/api/monitor/probe", { id });
+    else if (b.dataset.a === "deep") await post("/api/monitor/deep", { id });
+    else if (b.dataset.a === "toggle") { const s = mState.sites.find((x) => x.id === id); await post("/api/monitor/site", { ...s, enabled: !s.enabled }); }
+    else if (b.dataset.a === "rm" && confirm(mt("sure"))) { await post("/api/monitor/remove", { id }); curId = null; detail = null; }
+  } catch (err) { $("mErr").textContent = err.message; }
+  setTimeout(() => { loadMon(); loadDetail(); }, 700);
+};
+function fillSettings() {
+  const s = mState.sites.find((x) => x.id === curId); if (!s) return;
+  $("sName").value = s.name; $("sLight").value = s.lightMin; $("sSlow").value = s.slowMs || 3000; $("sDeep").value = s.deepMin || 0; $("sKw").value = s.keyword || ""; $("sTok").value = ""; $("sTok").placeholder = s.hasToken ? (lang === "ar" ? "محفوظ على الجهاز" : "saved on this computer") : ""; $("sPaths").value = (s.paths || []).join("\n"); $("sWatch").checked = !!s.watchContent; $("sMsg").textContent = "";
+}
+$("sSave").onclick = async () => {
+  const s = mState.sites.find((x) => x.id === curId); if (!s) return;
+  try {
+    const body = { id: s.id, url: s.url, enabled: s.enabled, name: $("sName").value, lightMin: $("sLight").value, slowMs: $("sSlow").value, deepMin: $("sDeep").value, keyword: $("sKw").value, paths: $("sPaths").value, watchContent: $("sWatch").checked };
+    if ($("sTok").value.trim()) body.token = $("sTok").value;
+    await post("/api/monitor/site", body); $("sMsg").textContent = vt("sSaved"); $("sTok").value = ""; await loadMon(); fillSettings(); $("sMsg").textContent = vt("sSaved"); setTimeout(loadDetail, 1200);
+  } catch (e) { $("sMsg").textContent = e.message; }
+};
+
+// ----- this computer -----
+function meter(p) { return `<div class="meter ${p >= 90 ? "crit" : p >= 75 ? "hot" : ""}"><i style="width:${Math.min(100, p)}%"></i></div>`; }
+function renderDev() {
+  const labels = { setT: "setT", sNameL: "sName", sLightL: "sLight", sSlowL: "sSlow", sDeepL: "sDeep", sKwL: "sKw", sTokL: "sTok", sPathsL: "sPaths", sWatchL: "sWatch", sSave: "sSave" };
+  for (const [id, k] of Object.entries(labels)) $(id).textContent = vt(k);
+  if (!sysData) { $("devBody").innerHTML = `<div class="help" style="padding:22px 0">${vt("loading")}</div>`; return; }
+  const d = sysData, n = d.net, o = d.os, a = d.app, ramP = Math.round((1 - o.memFree / o.memTotal) * 100);
+  const okMs = n.targets.filter((x) => x.ok).map((x) => x.ms), best = okMs.length ? Math.min(...okMs) : null;
+  let h = `<div class="bigbox ${n.ok === false ? "down" : "up"}"><div><b>${n.ok === false ? vt("netBad") : n.ok ? vt("netOk") : vt("netWait")}</b><span class="help">${n.at ? vt("netChecked") + " " + ago(n.at) : ""}${best != null ? " · " + V(fmtMs(best)) : ""}${n.dnsMs != null ? " · " + vt("netDns") + " " + V(fmtMs(n.dnsMs)) : ""}</span></div><button type="button" id="netBtn" style="margin-inline-start:auto">${vt("netCheck")}</button></div>`;
+  h += `<p class="help">${vt("netWhy")}</p>`;
+  h += `<div class="scroll"><table class="tbl"><thead><tr><th>${vt("netTarget")}</th><th>${vt("cOk")}</th><th>${vt("cMs")}</th></tr></thead><tbody>${n.targets.map((x) => `<tr><td>${esc(x.name)}</td><td class="${x.ok ? "good" : "bad"}">${x.ok ? vt("netOn") : esc(x.err || vt("netOff"))}</td><td class="ltr">${x.ok ? fmtMs(x.ms) : "-"}</td></tr>`).join("")}</tbody></table></div>`;
+  if (n.log.length > 2) h += `<div class="help" style="margin-top:10px">${vt("netLog")}</div>${miniLine(n.log.map((x) => x.ms), null)}`;
+  h += `<div class="cols"><div class="blk"><h3>${vt("pcT")}</h3>
+    <div>${vt("pcCpu")} <b class="v">${o.cpu}%</b></div>${meter(o.cpu)}${miniLine(o.cpuHist, 100)}
+    <div style="margin-top:12px">${vt("pcRam")} <b class="v">${ramP}%</b> <span class="help v">${fmtB(o.memTotal - o.memFree)} / ${fmtB(o.memTotal)}</span></div>${meter(ramP)}${miniLine(o.memHist, 100)}
+    <dl class="facts" style="grid-template-columns:1fr;margin-top:12px"><div><dt>${vt("pcOs")}</dt><dd>${esc(o.platform)} ${esc(o.arch)}</dd></div><div><dt>${vt("pcCores")}</dt><dd>${o.cores}</dd></div><div><dt>${vt("pcUp")}</dt><dd>${fmtDur(o.uptime * 1000)}</dd></div></dl></div>
+  <div class="blk"><h3>${vt("appT")}</h3><dl class="facts" style="grid-template-columns:1fr;margin:0">
+    <div><dt>${vt("aUp")}</dt><dd>${fmtDur(a.uptime * 1000)}</dd></div><div><dt>${vt("aMem")}</dt><dd>${fmtB(a.rss)}</dd></div>
+    <div><dt>${vt("aProbes")}</dt><dd>${a.probes}</dd></div><div><dt>${vt("aFailed")}</dt><dd style="color:var(${a.failed ? "--fail" : "--pass"})">${a.failed}</dd></div>
+    <div><dt>${vt("aLag")}</dt><dd>${a.lagMs} ms</dd></div><div><dt>${vt("aData")}</dt><dd>${fmtB(a.dataBytes)}</dd></div>
+    <div><dt>${vt("aSites")}</dt><dd>${a.active} / ${a.sites}</dd></div><div><dt>${vt("aDeep")}</dt><dd>${a.deep}</dd></div>
+    <div><dt>${vt("aSched")}</dt><dd style="color:var(${a.timer ? "--pass" : "--fail"})">${a.timer ? vt("schedOn") : vt("schedOff")}</dd></div><div><dt>Node</dt><dd>${esc(a.node)}</dd></div></dl></div></div>`;
+  const al = d.alerts;
+  h += `<div class="blk"><h3>${vt("alT")}</h3><div class="chips"><span class="chip ${al.telegram ? "ok" : "no"}">${vt("alTg")} · ${al.telegram ? vt("alOn") : vt("alOff")}</span><span class="chip ${al.webhook ? "ok" : "no"}">${vt("alWh")} · ${al.webhook ? vt("alOn") : vt("alOff")}</span></div><div class="help" style="margin-top:12px">${vt("alLog")}</div>${al.log.length ? `<div class="tl">${al.log.map((x) => `<div class="ev"><time>${fmtT(x.t)}</time>${esc(x.text)}<div class="help">${esc((x.sent || []).join(", ") || "-")}</div></div>`).join("")}</div>` : `<div class="help">${vt("alNone")}</div>`}</div>`;
+  $("devBody").innerHTML = h;
+}
+$("devBody").onclick = (e) => { if (e.target.closest("#netBtn")) { e.target.closest("#netBtn").disabled = true; loadSys(true); } };
+
+function showTab(n) {
+  document.querySelectorAll("[data-panel]").forEach((p) => { p.hidden = p.dataset.panel !== n; });
+  document.querySelectorAll("#tabs button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === n)));
+  try { localStorage.setItem("mm_tab", n); } catch { /* private mode */ }
+}
+document.querySelectorAll("#tabs button").forEach((b) => { b.onclick = () => showTab(b.dataset.tab); });
+let mBusy = false, mErrShown = false;
+async function loadMon() {
+  if (mBusy) return; mBusy = true;
+  try { mState = await (await fetch("/api/monitor/state")).json(); window.mState = mState; renderMon(); if (mErrShown) { $("mErr").textContent = ""; mErrShown = false; } }
+  catch { $("mErr").textContent = mt("lost"); mErrShown = true; }
+  mBusy = false;
+}
+$("quitBtn").onclick = async () => { if (confirm(lang === "ar" ? "ده هيقفل نوكتوا والمراقبة بالكامل. تكمل؟" : "This closes Noctua and all monitoring. Continue?")) { try { await post("/api/quit"); } catch { /* it closes */ } document.body.innerHTML = "<p style='padding:30px;font:18px sans-serif'>Noctua closed. You can close this window.</p>"; } };
+$("mList").onclick = async (e) => {
+  const b = e.target.closest("button[data-a]"); if (!b) return; const id = b.dataset.id, s = mState.sites.find((x) => x.id === id);
+  try {
+    if (b.dataset.a === "open") { openSite(id); return; }
+    if (b.dataset.a === "probe") await post("/api/monitor/probe", { id });
+    else if (b.dataset.a === "deep") await post("/api/monitor/deep", { id });
+    else if (b.dataset.a === "toggle") await post("/api/monitor/site", { ...s, enabled: !s.enabled });
+    else if (b.dataset.a === "rm" && confirm(mt("sure"))) await post("/api/monitor/remove", { id });
+  } catch (err) { $("mErr").textContent = err.message; }
+  setTimeout(loadMon, 700);
+};
+$("mAddBtn").onclick = async () => {
+  $("mErr").textContent = "";
+  try { await post("/api/monitor/site", { url: val("mUrl"), name: val("mName"), lightMin: val("mLight"), deepMin: val("mDeep") }); $("mUrl").value = ""; $("mName").value = ""; loadMon(); }
+  catch (e) { $("mErr").textContent = e.message; }
+};
+$("aSave").onclick = async () => { try { await post("/api/monitor/alerts", { telegramToken: val("aTg"), telegramChatId: val("aChat"), webhookUrl: val("aHook") }); $("aTg").value = ""; $("aMsg").textContent = mt("saved"); loadMon(); } catch (e) { $("aMsg").textContent = e.message; } };
+$("aTest").onclick = async () => { try { const r = await post("/api/monitor/test-alert"); $("aMsg").textContent = (r.sent || []).join(", ") || mt("alertsOff"); } catch (e) { $("aMsg").textContent = e.message; } };
+{ const es2 = new EventSource("/api/monitor/events"); let tm; es2.onmessage = () => { clearTimeout(tm); tm = setTimeout(() => { loadMon(); refreshView(); }, 300); }; }
+setInterval(loadMon, 15000); document.addEventListener("visibilitychange", () => { if (!document.hidden) loadMon(); });
+$("langBtn").addEventListener("click", renderMon);
+
+// ---------- the eye ----------
+(() => {
+  const pg = document.getElementById("pupilG"); let tx = 0, ty = 0;
+  addEventListener("pointermove", (e) => {
+    document.documentElement.style.setProperty("--mx", e.clientX + "px"); document.documentElement.style.setProperty("--my", e.clientY + "px");
+    const r = document.getElementById("eye").getBoundingClientRect(), dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2), d = Math.hypot(dx, dy) || 1, k = Math.min(1, d / 300) * 11;
+    tx = (dx / d) * k; ty = (dy / d) * k; pg.style.transform = `translate(${tx.toFixed(1)}px,${ty.toFixed(1)}px)`;
+  }, { passive: true });
+  const upd = () => { const down = (window.mState?.sites || []).some((x) => x.enabled && x.last && !x.last.ok && !x.last.noNet); document.body.dataset.eye = down ? "alarm" : !$("stopBtn").hidden ? "run" : "idle"; };
+  new MutationObserver(upd).observe($("stopBtn"), { attributes: true, attributeFilter: ["hidden"] });
+  setInterval(upd, 1500); upd();
+})();
+try { sub = localStorage.getItem("mm_sub") || "over"; } catch { /* ignore */ }
+renderSubnav(); applyLang(); setRunning(false); loadState(true); loadMon(); showTab((() => { try { return localStorage.getItem("mm_tab") || "watch"; } catch { return "watch"; } })());
+</script>
+</body>
+</html>

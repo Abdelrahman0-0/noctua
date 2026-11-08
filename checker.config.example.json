@@ -1,0 +1,29 @@
+{
+  "ignoreConsole": ["ResizeObserver loop"],
+  "ignoreUrls": ["googletagmanager", "fonts.gstatic"],
+  "skipClickText": ["Apply now", "Submit final"],
+  "flows": [
+    {
+      "name": "Chat with Salma",
+      "steps": [
+        { "goto": "/" },
+        { "click": "text=Inbox" },
+        { "fill": ["textarea", "When is the release?"] },
+        { "click": "text=Send" },
+        { "waitApi": "/api/ai" },
+        { "expectText": "Monday" },
+        { "screenshot": true }
+      ]
+    },
+    {
+      "name": "Upload a CV",
+      "steps": [
+        { "goto": "/" },
+        { "click": "text=Profile" },
+        { "upload": ["input[type=file]", "pdf"] },
+        { "wait": 2000 },
+        { "expectText": "Sara" }
+      ]
+    }
+  ]
+}

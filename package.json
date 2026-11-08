@@ -1,0 +1,98 @@
+{
+  "name": "noctua",
+  "version": "1.4.0",
+  "description": "Noctua: a standalone black-box checker for websites and their AI features. API, AI answers, real browser UI.",
+  "type": "module",
+  "bin": {
+    "noctua": "check.mjs"
+  },
+  "scripts": {
+    "check": "node check.mjs",
+    "selftest": "node selftest.mjs && node selftest-deep.mjs && node selftest-app.mjs",
+    "bench": "node bench.mjs",
+    "setup": "npx playwright install chromium",
+    "start": "node app.mjs",
+    "app": "node app.mjs",
+    "server": "node app.mjs --no-open",
+    "desktop": "electron .",
+    "dist": "electron-builder --win nsis --x64",
+    "release": "electron-builder --win nsis --x64 --publish always"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11",
+    "playwright": "^1.48.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "main": "electron/main.cjs",
+  "author": "Noctua",
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "app.noctua.desktop",
+    "productName": "Noctua",
+    "asar": false,
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**",
+      "lib/**",
+      "ui/**",
+      "app.mjs",
+      "check.mjs",
+      "bench.mjs",
+      "checker.config.json",
+      "package.json",
+      "build/icon.png",
+      "node_modules/**",
+      "!node_modules/.cache",
+      "!**/node_modules/*/{test,tests,docs}/**",
+      "!**/*.md"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "Noctua",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "allowElevation": true,
+      "installerLanguages": [
+        "en_US",
+        "ar"
+      ],
+      "language": "1033",
+      "displayLanguageSelector": false,
+      "uninstallDisplayName": "Noctua"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Abdelrahman0-0",
+        "repo": "noctua",
+        "releaseType": "release"
+      }
+    ]
+  }
+}
