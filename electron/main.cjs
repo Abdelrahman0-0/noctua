@@ -16,6 +16,25 @@ else {
   app.whenReady().then(boot).catch((e) => { dialog.showErrorBox("Noctua", String(e && e.stack || e)); app.exit(1); });
 }
 
+const prefsFile = () => path.join(app.getPath("userData"), "prefs.json");
+const readPrefs = () => { try { return JSON.parse(fs.readFileSync(prefsFile(), "utf8")); } catch { return {}; } };
+const writePrefs = (p) => { try { fs.writeFileSync(prefsFile(), JSON.stringify(p)); } catch { /* ignore */ } };
+
+// The intro: a short dark owl animation while Noctua starts. Click or press a key to skip it.
+function playIntro() {
+  return new Promise((resolve) => {
+    const w = new BrowserWindow({ width: 760, height: 440, frame: false, resizable: false, movable: false, show: false, center: true, skipTaskbar: true,
+      alwaysOnTop: true, backgroundColor: "#050506", webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
+    let over = false;
+    const end = () => { if (over) return; over = true; clearTimeout(guard); try { w.destroy(); } catch { /* ignore */ } resolve(); };
+    const guard = setTimeout(end, 7000); // never let the intro hold the app up
+    w.once("ready-to-show", () => w.show());
+    w.webContents.on("page-title-updated", (_e, title) => { if (title === "done") end(); });
+    w.on("closed", end);
+    w.loadFile(path.join(__dirname, "splash.html"), { query: { lang: ar() ? "ar" : "en" } }).catch(end);
+  });
+}
+
 const ar = () => /^ar/i.test(app.getLocale());
 const T = (a, e) => (ar() ? a : e);
 
@@ -34,6 +53,7 @@ function migrateOldInstall(dataDir) {
 
 async function boot() {
   Menu.setApplicationMenu(null);
+  const intro = !hidden && readPrefs().intro !== false ? playIntro() : Promise.resolve();
   const ud = app.getPath("userData");
   const dataDir = process.env.NOCTUA_DATA || path.join(ud, "data");
   fs.mkdirSync(dataDir, { recursive: true });
@@ -48,6 +68,7 @@ async function boot() {
     onQuit: () => quit(),
   });
   makeTray();
+  await intro; // the window appears when the intro ends (it plays while Noctua starts)
   if (!hidden) showWindow();
   setupUpdates();
 }
@@ -118,6 +139,8 @@ function makeTray() {
     { type: "separator" },
     { label: T("تشغيل مع ويندوز", "Start with Windows"), type: "checkbox", checked: app.getLoginItemSettings().openAtLogin,
       click: (m) => { app.setLoginItemSettings({ openAtLogin: m.checked, args: ["--hidden"] }); } },
+    { label: T("عرض المقدمة عند التشغيل", "Play the intro at start"), type: "checkbox", checked: readPrefs().intro !== false,
+      click: (m) => writePrefs({ ...readPrefs(), intro: m.checked }) },
     { type: "separator" },
     { label: T("خروج (إيقاف المراقبة)", "Quit (stop monitoring)"), click: () => quit() },
   ]);

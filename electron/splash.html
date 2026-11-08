@@ -1,0 +1,170 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Noctua</title>
+<style>
+html,body{margin:0;height:100%;background:#050506;overflow:hidden;cursor:default;user-select:none}
+canvas{display:block;width:100%;height:100%}
+</style></head>
+<body><canvas id="c"></canvas>
+<script>
+// Noctua intro. The idea of the program in 4.5 seconds: it is dark, an owl opens its eyes,
+// light exists only where it looks, it checks things in the dark, and it finds the one that is down.
+const AR = new URLSearchParams(location.search).get("lang") === "ar";
+const W = 760, H = 440, DPR = Math.min(2, window.devicePixelRatio || 1);
+const cv = document.getElementById("c"); cv.width = W * DPR; cv.height = H * DPR;
+const g = cv.getContext("2d"); g.scale(DPR, DPR);
+const DUR = 4700;
+
+// ---- helpers ----
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const sm = (x) => { x = clamp(x); return x * x * (3 - 2 * x); };
+const eo = (x) => 1 - Math.pow(1 - clamp(x), 3);
+const lerp = (a, b, t) => a + (b - a) * t;
+let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+
+// ---- the things hidden in the dark: sites being watched ----
+const LABELS = ["api  200", "dns  12ms", "tls  ok", "/health", "200  48ms", "cert  61d", "ttfb  90ms", "ping  ok", "200", "tcp  ok", "/login", "up  99.9%"];
+const nodes = [];
+for (let i = 0; i < 34; i++) {
+  const x = 40 + rnd() * (W - 80), y = H * 0.56 + rnd() * (H * 0.4);
+  nodes.push({ x, y, label: LABELS[i % LABELS.length], ph: rnd() * 6.28 });
+}
+const DOWN = { x: W * 0.7, y: H * 0.8 };            // the one that is down
+nodes.push({ x: DOWN.x, y: DOWN.y, label: "DOWN", down: true, ph: 0 });
+const motes = Array.from({ length: 46 }, () => ({ x: rnd() * W, y: rnd() * H, s: 0.3 + rnd() * 0.9, p: rnd() * 6.28 }));
+
+// ---- where the owl looks ----
+const GAZE = [[0, W * .5, H * .62], [1500, W * .5, H * .78], [1850, W * .2, H * .74], [2250, W * .38, H * .9], [2620, DOWN.x, DOWN.y], [3250, DOWN.x + 3, DOWN.y - 2], [3550, W * .5, H * .76]];
+function gaze(t) {
+  if (t <= GAZE[0][0]) return { x: GAZE[0][1], y: GAZE[0][2] };
+  for (let i = 1; i < GAZE.length; i++) if (t <= GAZE[i][0]) {
+    const a = GAZE[i - 1], b = GAZE[i], k = sm((t - a[0]) / (b[0] - a[0]));
+    return { x: lerp(a[1], b[1], k), y: lerp(a[2], b[2], k) };
+  }
+  const l = GAZE[GAZE.length - 1]; return { x: l[1], y: l[2] };
+}
+const radius = (t) => 150 * sm((t - 1500) / 450) + 210 * sm((t - 3400) / 800);
+const spot = (d, r) => r <= 0 ? 0 : Math.pow(clamp(1 - d / r), 1.6);
+
+// ---- eyes ----
+const EYE_Y = H * 0.3, EYE_DX = 112, R = 50;
+function openness(t, delay) {
+  let o = eo((t - delay) / 750);
+  if (o > 0.35 && o < 1) o += Math.sin((t - delay) * 0.03) * 0.03;      // a slight flutter as they open
+  const blink = (a) => { const k = (t - a) / 230; return k > 0 && k < 1 ? 1 - Math.sin(k * Math.PI) : 1; };
+  o *= blink(3250 + delay * 0.04);
+  const close = sm((t - 4150) / 450);
+  return clamp(o * (1 - close));
+}
+function eye(cx, cy, o, look, pupil, glow) {
+  if (o <= 0.01) return;
+  const w = R * 1.35, h = R * 1.05 * o;
+  // glow in the dark
+  g.save(); g.globalCompositeOperation = "lighter";
+  const gl = g.createRadialGradient(cx, cy, R * .3, cx, cy, R * 3.2);
+  gl.addColorStop(0, `rgba(255,170,30,${0.28 * glow * o})`); gl.addColorStop(1, "rgba(255,120,0,0)");
+  g.fillStyle = gl; g.fillRect(cx - R * 3.3, cy - R * 3.3, R * 6.6, R * 6.6); g.restore();
+  g.save();
+  g.beginPath(); g.moveTo(cx - w, cy);                                   // almond shaped lid opening
+  g.quadraticCurveTo(cx, cy - h * 1.9, cx + w, cy); g.quadraticCurveTo(cx, cy + h * 1.9, cx - w, cy); g.closePath(); g.clip();
+  g.fillStyle = "#1a0d00"; g.fillRect(cx - w, cy - R, w * 2, R * 2);
+  const ix = cx + look.x * 11, iy = cy + look.y * 8;
+  const ir = g.createRadialGradient(ix, iy, R * .1, ix, iy, R);
+  ir.addColorStop(0, "#fff0b0"); ir.addColorStop(.28, "#ffc24a"); ir.addColorStop(.7, "#e07a00"); ir.addColorStop(1, "#5a2400");
+  g.fillStyle = ir; g.beginPath(); g.arc(ix, iy, R, 0, 6.2832); g.fill();
+  g.strokeStyle = "rgba(90,30,0,.35)"; g.lineWidth = 1;                  // fibres of the iris
+  for (let k = 0; k < 44; k++) { const a = k / 44 * 6.2832; g.beginPath(); g.moveTo(ix + Math.cos(a) * R * .38, iy + Math.sin(a) * R * .38); g.lineTo(ix + Math.cos(a) * R * .96, iy + Math.sin(a) * R * .96); g.stroke(); }
+  const pr = R * pupil;
+  g.fillStyle = "#000"; g.beginPath(); g.arc(ix + look.x * 3, iy + look.y * 2, pr, 0, 6.2832); g.fill();
+  g.fillStyle = "rgba(255,255,255,.85)"; g.beginPath(); g.arc(ix - R * .28, iy - R * .3, R * .08, 0, 6.2832); g.fill();
+  // heavy lids: shadow at the top and bottom edges
+  const sh = g.createLinearGradient(0, cy - h, 0, cy + h);
+  sh.addColorStop(0, "rgba(0,0,0,.75)"); sh.addColorStop(.28, "rgba(0,0,0,0)"); sh.addColorStop(.72, "rgba(0,0,0,0)"); sh.addColorStop(1, "rgba(0,0,0,.6)");
+  g.fillStyle = sh; g.fillRect(cx - w, cy - h * 1.5, w * 2, h * 3);
+  g.restore();
+}
+
+// ---- frame ----
+function draw(t) {
+  t = clamp(t, 0, DUR);
+  const gz = gaze(t), r = radius(t);
+  const lockK = sm((t - 2450) / 220) * (1 - sm((t - 3250) / 250));        // 1 while it has found the down site
+  const fade = 1 - sm((t - 4250) / 420);
+
+  g.save();
+  g.fillStyle = "#050506"; g.fillRect(0, 0, W, H);
+  if (lockK > 0.05 && t < 3250) g.translate((Math.sin(t * 0.9) * 1.6) * lockK, (Math.cos(t * 1.3) * 1.2) * lockK); // a small tremor
+
+  // two cones of light from the eyes to where it looks
+  const exL = W / 2 - EYE_DX, exR = W / 2 + EYE_DX;
+  if (r > 0) {
+    g.save(); g.globalCompositeOperation = "lighter";
+    for (const ex of [exL, exR]) {
+      const gr = g.createLinearGradient(ex, EYE_Y, gz.x, gz.y);
+      gr.addColorStop(0, "rgba(255,170,40,.10)"); gr.addColorStop(1, "rgba(255,170,40,.02)");
+      g.fillStyle = gr; g.beginPath(); g.moveTo(ex - 4, EYE_Y); g.lineTo(ex + 4, EYE_Y);
+      g.lineTo(gz.x + r * .55, gz.y); g.lineTo(gz.x - r * .55, gz.y); g.closePath(); g.fill();
+    }
+    const pool = g.createRadialGradient(gz.x, gz.y, 0, gz.x, gz.y, r);
+    const red = lockK;
+    pool.addColorStop(0, `rgba(${255},${Math.round(176 - 110 * red)},${Math.round(70 - 40 * red)},.22)`); pool.addColorStop(1, "rgba(255,150,40,0)");
+    g.fillStyle = pool; g.fillRect(gz.x - r, gz.y - r, r * 2, r * 2); g.restore();
+  }
+
+  // what it can see: only things in the light (and a fading memory of where the light just was)
+  const calm = 1 - 0.8 * sm((t - 3450) / 450);   // the sites sink back into the dark so the name can stand out
+  const seen = (x, y) => { let a = spot(Math.hypot(x - gz.x, y - gz.y), r); for (let k = 1; k <= 12; k++) { const p = gaze(t - k * 70); a = Math.max(a, spot(Math.hypot(x - p.x, y - p.y), radius(t - k * 70)) * Math.exp(-k * 0.3)); } return a * calm; };
+  g.textBaseline = "middle"; g.font = "11px Consolas, 'Courier New', monospace"; g.textAlign = "left";
+  for (const n of nodes) {
+    const a = seen(n.x, n.y); if (a < 0.02) continue;
+    if (n.down) {
+      const fl = t > 2500 ? (0.55 + 0.45 * Math.sin(t * 0.045)) : 1, since = (t - 2600) / 700;
+      g.fillStyle = `rgba(255,59,59,${clamp(a * 1.4) * fl})`; g.beginPath(); g.arc(n.x, n.y, 4.5, 0, 6.2832); g.fill();
+      g.fillText("DOWN", n.x + 11, n.y + 1);
+      if (since > 0 && since < 1.4) { g.strokeStyle = `rgba(255,59,59,${.6 * (1 - since / 1.4)})`; g.lineWidth = 1.2; g.beginPath(); g.arc(n.x, n.y, 6 + since * 34, 0, 6.2832); g.stroke(); }
+    } else {
+      g.fillStyle = `rgba(110,210,150,${a * .85})`; g.beginPath(); g.arc(n.x, n.y, 2.6, 0, 6.2832); g.fill();
+      g.fillStyle = `rgba(200,190,160,${a * .55})`; g.fillText(n.label, n.x + 9, n.y + 1);
+    }
+  }
+  for (const m of motes) {                                                  // dust, only visible in the light
+    const x = (m.x + t * 0.012 * m.s) % W, y = m.y + Math.sin(t * 0.0013 + m.p) * 8, a = seen(x, y) * .5;
+    if (a > .02) { g.fillStyle = `rgba(255,220,160,${a})`; g.fillRect(x, y, 1.4, 1.4); }
+  }
+
+  // the eyes: they open slowly, the pupils widen in the dark, then pinch when it finds the problem
+  const pupil = lerp(0.52, 0.2, lockK) * (1 + 0.1 * Math.sin(t * 0.004));
+  const look = { x: clamp((gz.x - W / 2) / 260, -1, 1), y: clamp((gz.y - EYE_Y) / 200, -.2, 1) };
+  const glow = 0.8 + 0.2 * Math.sin(t * 0.006);
+  eye(exL, EYE_Y, openness(t, 520) * (1 - 0.18 * lockK), look, pupil, glow);
+  eye(exR, EYE_Y, openness(t, 880) * (1 - 0.18 * lockK), look, pupil, glow);
+
+  // the name, lit letter by letter by its gaze
+  if (t > 3450) {
+    const name = "NOCTUA", sp = 15; g.font = "300 46px Georgia, 'Times New Roman', serif"; g.textAlign = "center";
+    const tw = name.split("").reduce((s, ch) => s + g.measureText(ch).width + sp, -sp); let x = W / 2 - tw / 2;
+    for (let i = 0; i < name.length; i++) {
+      const cw = g.measureText(name[i]).width, k = clamp((t - 3500 - i * 85) / 260), fl = k < 1 ? (Math.sin(t * 0.2 + i * 3) > -0.3 ? 1 : .25) : 1;
+      g.fillStyle = `rgba(242,236,222,${k * fl * .96})`; g.fillText(name[i], x + cw / 2, H * 0.8); x += cw + sp;
+    }
+    const tg = clamp((t - 4000) / 350);
+    if (tg > 0) { g.font = "14px 'Segoe UI', Tahoma, sans-serif"; g.fillStyle = `rgba(255,176,0,${tg * .8})`; g.direction = AR ? "rtl" : "ltr"; g.fillText(AR ? "بومة بتشوف في الضلمة" : "it sees in the dark", W / 2, H * 0.8 + 38); g.direction = "ltr"; }
+  }
+
+  // vignette and the fade to black
+  const v = g.createRadialGradient(W / 2, H / 2, H * .25, W / 2, H / 2, W * .65);
+  v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, "rgba(0,0,0,.8)");
+  g.fillStyle = v; g.fillRect(-4, -4, W + 8, H + 8);
+  g.restore();
+  if (fade < 1) { g.fillStyle = `rgba(5,5,6,${1 - fade})`; g.fillRect(0, 0, W, H); }
+}
+
+// ---- play ----
+window.__t = draw;                                                          // lets the tests draw any moment
+let done = false;
+const finish = () => { if (!done) { done = true; document.title = "done"; } };
+if (location.hash !== "#seek") {
+  const t0 = performance.now();
+  (function loop() { const t = performance.now() - t0; draw(t); if (t < DUR) requestAnimationFrame(loop); else finish(); })();
+  addEventListener("pointerdown", finish); addEventListener("keydown", finish);   // click or any key skips it
+} else draw(0);
+</script></body></html>
