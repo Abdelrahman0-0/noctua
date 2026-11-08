@@ -1,170 +1,260 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><title>Noctua</title>
 <style>
-html,body{margin:0;height:100%;background:#050506;overflow:hidden;cursor:default;user-select:none}
-canvas{display:block;width:100%;height:100%}
+html,body{margin:0;height:100%;overflow:hidden;background:transparent;cursor:none;user-select:none}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+#demo{position:fixed;inset:0;z-index:-1}
 </style></head>
 <body><canvas id="c"></canvas>
 <script>
-// Noctua intro. The idea of the program in 4.5 seconds: it is dark, an owl opens its eyes,
-// light exists only where it looks, it checks things in the dark, and it finds the one that is down.
-const AR = new URLSearchParams(location.search).get("lang") === "ar";
-const W = 760, H = 440, DPR = Math.min(2, window.devicePixelRatio || 1);
-const cv = document.getElementById("c"); cv.width = W * DPR; cv.height = H * DPR;
-const g = cv.getContext("2d"); g.scale(DPR, DPR);
-const DUR = 4700;
+// Noctua intro, full screen. The window is transparent: your real desktop is what the darkness swallows,
+// and the only parts of it you see again are the ones the owl is looking at.
+//   0.0s  the lights fail one by one, the dark closes in from the edges, a heartbeat starts
+//   2.0s  two embers open in the black: eyes. Dozens of smaller eyes open around the screen and stare
+//   2.9s  the owl looks around; where it looks, your real desktop shows through. Something is out there in the dark
+//   5.0s  it finds the one that is down: every other eye shuts at once, the screen cracks, the pupils pinch
+//   5.9s  black. Silence for a beat
+//   6.4s  the name is lit by its gaze, letter by letter. Then the eyes close and the dark lifts
+const Q = new URLSearchParams(location.search);
+const AR = Q.get("lang") === "ar", MUTE = Q.get("mute") === "1", SEEK = location.hash.startsWith("#seek");
+const DUR = 8200, REVEAL = 7500;
+const cv = document.getElementById("c");
+let W, H, DPR, U, g, nodes, links, swarm, cracks, beats, grain, down;
 
-// ---- helpers ----
 const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
 const sm = (x) => { x = clamp(x); return x * x * (3 - 2 * x); };
 const eo = (x) => 1 - Math.pow(1 - clamp(x), 3);
 const lerp = (a, b, t) => a + (b - a) * t;
-let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 
-// ---- the things hidden in the dark: sites being watched ----
-const LABELS = ["api  200", "dns  12ms", "tls  ok", "/health", "200  48ms", "cert  61d", "ttfb  90ms", "ping  ok", "200", "tcp  ok", "/login", "up  99.9%"];
-const nodes = [];
-for (let i = 0; i < 34; i++) {
-  const x = 40 + rnd() * (W - 80), y = H * 0.56 + rnd() * (H * 0.4);
-  nodes.push({ x, y, label: LABELS[i % LABELS.length], ph: rnd() * 6.28 });
+function build() {
+  seed = 11;
+  down = { x: W * 0.72, y: H * 0.74 };
+  nodes = Array.from({ length: 78 }, () => ({ x: rnd() * W, y: rnd() * H, ph: rnd() * 6.28, s: 0.7 + rnd() * 0.9 }));
+  nodes.push({ x: down.x, y: down.y, down: true, ph: 0, s: 1.5 });
+  links = []; const deg = new Array(nodes.length).fill(0);
+  for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++)
+    if (deg[i] < 3 && deg[j] < 3 && Math.hypot(nodes[i].x - nodes[j].x, nodes[i].y - nodes[j].y) < 200 * U) { links.push([i, j]); deg[i]++; deg[j]++; }
+  swarm = [];
+  for (let k = 0, tries = 0; k < 28 && tries < 400; tries++) {
+    const x = W * (0.04 + 0.92 * rnd()), y = H * (0.06 + 0.88 * rnd());
+    if (Math.hypot(x - W / 2, y - H * 0.3) < 300 * U || Math.hypot(x - down.x, y - down.y) < 90 * U) continue;
+    swarm.push({ x, y, gap: (9 + rnd() * 15) * U, r: (3.5 + rnd() * 5.5) * U, at: 2300 + rnd() * 1800, tilt: (rnd() - 0.5) * 0.5, bl: rnd() * 6000 }); k++;
+  }
+  cracks = Array.from({ length: 10 }, () => {
+    let a = rnd() * 6.283, x = down.x, y = down.y; const pts = [[x, y]], len = (160 + rnd() * 460) * U;
+    for (let i = 0; i < 10; i++) { a += (rnd() - 0.5) * 1.0; x += Math.cos(a) * len / 10; y += Math.sin(a) * len / 10; pts.push([x, y]); }
+    return pts;
+  });
+  beats = []; for (let b = 1000, iv = 1300; b < 5000; b += iv, iv = Math.max(640, iv * 0.93)) beats.push(b);
+  if (!grain) grain = Array.from({ length: 4 }, () => { const c = document.createElement("canvas"); c.width = c.height = 128; const x = c.getContext("2d"), d = x.createImageData(128, 128);
+    for (let i = 0; i < d.data.length; i += 4) { const v = rnd() * 255; d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = rnd() * 255; } x.putImageData(d, 0, 0); return c; });
 }
-const DOWN = { x: W * 0.7, y: H * 0.8 };            // the one that is down
-nodes.push({ x: DOWN.x, y: DOWN.y, label: "DOWN", down: true, ph: 0 });
-const motes = Array.from({ length: 46 }, () => ({ x: rnd() * W, y: rnd() * H, s: 0.3 + rnd() * 0.9, p: rnd() * 6.28 }));
+function size() {
+  W = innerWidth; H = innerHeight; DPR = Math.max(0.75, Math.min(devicePixelRatio || 1, 2800 / Math.max(W, 1)));
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR); g = cv.getContext("2d"); U = Math.min(W, H) / 900; build();
+}
 
-// ---- where the owl looks ----
-const GAZE = [[0, W * .5, H * .62], [1500, W * .5, H * .78], [1850, W * .2, H * .74], [2250, W * .38, H * .9], [2620, DOWN.x, DOWN.y], [3250, DOWN.x + 3, DOWN.y - 2], [3550, W * .5, H * .76]];
+// ---- where it looks, how far its light reaches, the heartbeat ----
+const GAZE = [[0, .5, .6], [2900, .5, .62], [3500, .2, .5], [4100, .3, .84], [4700, .84, .42], [5050, .72, .74], [5800, .72, .745], [6100, .5, .8], [7500, .5, .8]];
 function gaze(t) {
-  if (t <= GAZE[0][0]) return { x: GAZE[0][1], y: GAZE[0][2] };
   for (let i = 1; i < GAZE.length; i++) if (t <= GAZE[i][0]) {
     const a = GAZE[i - 1], b = GAZE[i], k = sm((t - a[0]) / (b[0] - a[0]));
-    return { x: lerp(a[1], b[1], k), y: lerp(a[2], b[2], k) };
+    return { x: lerp(a[1], b[1], k) * W, y: lerp(a[2], b[2], k) * H };
   }
-  const l = GAZE[GAZE.length - 1]; return { x: l[1], y: l[2] };
+  const l = GAZE[GAZE.length - 1]; return { x: l[1] * W, y: l[2] * H };
 }
-const radius = (t) => 150 * sm((t - 1500) / 450) + 210 * sm((t - 3400) / 800);
-const spot = (d, r) => r <= 0 ? 0 : Math.pow(clamp(1 - d / r), 1.6);
+const radius = (t) => U * (300 * sm((t - 2900) / 700) * (1 - sm((t - 5850) / 250)) + 300 * sm((t - 6350) / 700) * (1 - sm((t - 7500) / 500)));
+const spot = (d, r) => (r <= 0 ? 0 : Math.pow(clamp(1 - d / r), 1.6));
+function pulse(t) {
+  let p = 0; for (const b of beats) { const a = t - b; if (a >= 0 && a < 700) p += Math.exp(-a / 80); const c = a - 170; if (c >= 0 && c < 700) p += 0.6 * Math.exp(-c / 80); }
+  return Math.min(1.4, p) * (0.5 + 0.5 * sm((t - 1000) / 3500));
+}
 
 // ---- eyes ----
-const EYE_Y = H * 0.3, EYE_DX = 112, R = 50;
 function openness(t, delay) {
-  let o = eo((t - delay) / 750);
-  if (o > 0.35 && o < 1) o += Math.sin((t - delay) * 0.03) * 0.03;      // a slight flutter as they open
-  const blink = (a) => { const k = (t - a) / 230; return k > 0 && k < 1 ? 1 - Math.sin(k * Math.PI) : 1; };
-  o *= blink(3250 + delay * 0.04);
-  const close = sm((t - 4150) / 450);
-  return clamp(o * (1 - close));
+  let o = eo((t - 2000 - delay) / 900);
+  if (o > 0.35 && o < 1) o += Math.sin((t - delay) * 0.03) * 0.03;
+  o *= 1 - sm((t - 5750) / 160) * (1 - sm((t - 6150) / 300));      // one slow blink in the black
+  o *= 1 - sm((t - 7450) / 600);                                    // closes before the dark lifts
+  return clamp(o);
 }
-function eye(cx, cy, o, look, pupil, glow) {
-  if (o <= 0.01) return;
+function eye(cx, cy, R, o, look, pupil, glow, tint) {
   const w = R * 1.35, h = R * 1.05 * o;
-  // glow in the dark
   g.save(); g.globalCompositeOperation = "lighter";
-  const gl = g.createRadialGradient(cx, cy, R * .3, cx, cy, R * 3.2);
-  gl.addColorStop(0, `rgba(255,170,30,${0.28 * glow * o})`); gl.addColorStop(1, "rgba(255,120,0,0)");
-  g.fillStyle = gl; g.fillRect(cx - R * 3.3, cy - R * 3.3, R * 6.6, R * 6.6); g.restore();
-  g.save();
-  g.beginPath(); g.moveTo(cx - w, cy);                                   // almond shaped lid opening
+  const gl = g.createRadialGradient(cx, cy, R * 0.3, cx, cy, R * 3.4);
+  gl.addColorStop(0, `rgba(255,${Math.round(170 - 110 * tint)},${Math.round(30 - 20 * tint)},${0.34 * glow * Math.max(o, 0.15)})`); gl.addColorStop(1, "rgba(255,90,0,0)");
+  g.fillStyle = gl; g.fillRect(cx - R * 3.5, cy - R * 3.5, R * 7, R * 7); g.restore();
+  if (o <= 0.01) return;
+  g.save(); g.beginPath(); g.moveTo(cx - w, cy);
   g.quadraticCurveTo(cx, cy - h * 1.9, cx + w, cy); g.quadraticCurveTo(cx, cy + h * 1.9, cx - w, cy); g.closePath(); g.clip();
-  g.fillStyle = "#1a0d00"; g.fillRect(cx - w, cy - R, w * 2, R * 2);
-  const ix = cx + look.x * 11, iy = cy + look.y * 8;
-  const ir = g.createRadialGradient(ix, iy, R * .1, ix, iy, R);
-  ir.addColorStop(0, "#fff0b0"); ir.addColorStop(.28, "#ffc24a"); ir.addColorStop(.7, "#e07a00"); ir.addColorStop(1, "#5a2400");
+  g.fillStyle = "#140900"; g.fillRect(cx - w, cy - R, w * 2, R * 2);
+  const ix = cx + look.x * R * 0.22, iy = cy + look.y * R * 0.16, ir = g.createRadialGradient(ix, iy, R * 0.1, ix, iy, R);
+  ir.addColorStop(0, tint > 0.5 ? "#ffd0b0" : "#fff0b0"); ir.addColorStop(0.28, tint > 0.5 ? "#ff6a3a" : "#ffc24a"); ir.addColorStop(0.7, tint > 0.5 ? "#a81500" : "#e07a00"); ir.addColorStop(1, "#3a1400");
   g.fillStyle = ir; g.beginPath(); g.arc(ix, iy, R, 0, 6.2832); g.fill();
-  g.strokeStyle = "rgba(90,30,0,.35)"; g.lineWidth = 1;                  // fibres of the iris
-  for (let k = 0; k < 44; k++) { const a = k / 44 * 6.2832; g.beginPath(); g.moveTo(ix + Math.cos(a) * R * .38, iy + Math.sin(a) * R * .38); g.lineTo(ix + Math.cos(a) * R * .96, iy + Math.sin(a) * R * .96); g.stroke(); }
-  const pr = R * pupil;
-  g.fillStyle = "#000"; g.beginPath(); g.arc(ix + look.x * 3, iy + look.y * 2, pr, 0, 6.2832); g.fill();
-  g.fillStyle = "rgba(255,255,255,.85)"; g.beginPath(); g.arc(ix - R * .28, iy - R * .3, R * .08, 0, 6.2832); g.fill();
-  // heavy lids: shadow at the top and bottom edges
+  g.strokeStyle = "rgba(60,15,0,.4)"; g.lineWidth = Math.max(1, U);
+  for (let k = 0; k < 52; k++) { const a = k / 52 * 6.2832; g.beginPath(); g.moveTo(ix + Math.cos(a) * R * 0.4, iy + Math.sin(a) * R * 0.4); g.lineTo(ix + Math.cos(a) * R * 0.97, iy + Math.sin(a) * R * 0.97); g.stroke(); }
+  g.fillStyle = "#000"; g.beginPath(); g.arc(ix + look.x * R * 0.06, iy + look.y * R * 0.04, R * pupil, 0, 6.2832); g.fill();
+  g.fillStyle = "rgba(255,255,255,.88)"; g.beginPath(); g.arc(ix - R * 0.28, iy - R * 0.3, R * 0.08, 0, 6.2832); g.fill();
   const sh = g.createLinearGradient(0, cy - h, 0, cy + h);
-  sh.addColorStop(0, "rgba(0,0,0,.75)"); sh.addColorStop(.28, "rgba(0,0,0,0)"); sh.addColorStop(.72, "rgba(0,0,0,0)"); sh.addColorStop(1, "rgba(0,0,0,.6)");
-  g.fillStyle = sh; g.fillRect(cx - w, cy - h * 1.5, w * 2, h * 3);
+  sh.addColorStop(0, "rgba(0,0,0,.8)"); sh.addColorStop(0.3, "rgba(0,0,0,0)"); sh.addColorStop(0.7, "rgba(0,0,0,0)"); sh.addColorStop(1, "rgba(0,0,0,.65)");
+  g.fillStyle = sh; g.fillRect(cx - w, cy - h * 1.5, w * 2, h * 3); g.restore();
+}
+function smallEye(s, t) {
+  const a = eo((t - s.at) / 500), k = ((t + s.bl) % 2600) / 160, blink = k < 1 ? 1 - Math.sin(k * Math.PI) : 1;
+  const o = a * blink * (t < 5000 ? 1 : 0); if (o <= 0.02) return;
+  const lx = clamp((W / 2 - s.x) / W * 2, -1, 1) * s.r * 0.3;
+  g.save(); g.translate(s.x, s.y); g.rotate(s.tilt);
+  for (const dx of [-s.gap / 2, s.gap / 2]) {
+    g.save(); g.globalCompositeOperation = "lighter";
+    const gl = g.createRadialGradient(dx, 0, 0, dx, 0, s.r * 6); gl.addColorStop(0, `rgba(255,150,20,${0.42 * o})`); gl.addColorStop(1, "rgba(255,90,0,0)");
+    g.fillStyle = gl; g.fillRect(dx - s.r * 6, -s.r * 6, s.r * 12, s.r * 12); g.restore();
+    g.fillStyle = `rgba(255,${190 + (o * 40) | 0},70,${0.95 * o})`; g.beginPath(); g.ellipse(dx, 0, s.r * 1.3, Math.max(0.4, s.r * 0.95 * o), 0, 0, 6.2832); g.fill();
+    g.fillStyle = "#000"; g.beginPath(); g.ellipse(dx + lx, 0, s.r * 0.3, Math.max(0.4, s.r * 0.9 * o), 0, 0, 6.2832); g.fill();
+  }
   g.restore();
 }
 
-// ---- frame ----
+// ---- one frame ----
+const GLYPHS = "▒░▓#%/\\ᛟ◊¦"; let frame = 0;
 function draw(t) {
-  t = clamp(t, 0, DUR);
-  const gz = gaze(t), r = radius(t);
-  const lockK = sm((t - 2450) / 220) * (1 - sm((t - 3250) / 250));        // 1 while it has found the down site
-  const fade = 1 - sm((t - 4250) / 420);
+  t = clamp(t, 0, DUR); frame++;
+  g.setTransform(DPR, 0, 0, DPR, 0, 0); g.globalCompositeOperation = "source-over"; g.clearRect(0, 0, W, H);
+  const gz = gaze(t), r = radius(t), pl = pulse(t), lock = sm((t - 5000) / 150) * (1 - sm((t - 5800) / 300));
+  const EYE_DX = 165 * U, EYE_Y = H * 0.3, R = 64 * U;
+
+  let dk = 0.965 * sm(t / 1300);                                      // the dark closes in
+  for (const [a, b] of [[330, 380], [610, 650], [880, 940]]) if (t > a && t < b) dk *= 0.5;   // lights failing
+  const blackBeat = sm((t - 5900) / 250) * (1 - sm((t - 6250) / 200)); dk = lerp(dk, 0.992, blackBeat);
 
   g.save();
-  g.fillStyle = "#050506"; g.fillRect(0, 0, W, H);
-  if (lockK > 0.05 && t < 3250) g.translate((Math.sin(t * 0.9) * 1.6) * lockK, (Math.cos(t * 1.3) * 1.2) * lockK); // a small tremor
+  const sh = lock * 5 * U; g.translate(W / 2 + (Math.random() - 0.5) * sh, H / 2 + (Math.random() - 0.5) * sh); const k = 1 + 0.006 * pl; g.scale(k, k); g.translate(-W / 2, -H / 2);
+  g.fillStyle = `rgba(2,2,3,${dk})`; g.fillRect(-60, -60, W + 120, H + 120);
 
-  // two cones of light from the eyes to where it looks
-  const exL = W / 2 - EYE_DX, exR = W / 2 + EYE_DX;
-  if (r > 0) {
-    g.save(); g.globalCompositeOperation = "lighter";
-    for (const ex of [exL, exR]) {
-      const gr = g.createLinearGradient(ex, EYE_Y, gz.x, gz.y);
-      gr.addColorStop(0, "rgba(255,170,40,.10)"); gr.addColorStop(1, "rgba(255,170,40,.02)");
-      g.fillStyle = gr; g.beginPath(); g.moveTo(ex - 4, EYE_Y); g.lineTo(ex + 4, EYE_Y);
-      g.lineTo(gz.x + r * .55, gz.y); g.lineTo(gz.x - r * .55, gz.y); g.closePath(); g.fill();
+  if (r > 2) {                                                          // light carves the real desktop out of the dark
+    g.globalCompositeOperation = "destination-out";
+    for (const ex of [W / 2 - EYE_DX, W / 2 + EYE_DX]) {
+      g.fillStyle = "rgba(0,0,0,.14)"; g.beginPath(); g.moveTo(ex - 5 * U, EYE_Y); g.lineTo(ex + 5 * U, EYE_Y); g.lineTo(gz.x + r * 0.6, gz.y); g.lineTo(gz.x - r * 0.6, gz.y); g.closePath(); g.fill();
     }
     const pool = g.createRadialGradient(gz.x, gz.y, 0, gz.x, gz.y, r);
-    const red = lockK;
-    pool.addColorStop(0, `rgba(${255},${Math.round(176 - 110 * red)},${Math.round(70 - 40 * red)},.22)`); pool.addColorStop(1, "rgba(255,150,40,0)");
-    g.fillStyle = pool; g.fillRect(gz.x - r, gz.y - r, r * 2, r * 2); g.restore();
+    pool.addColorStop(0, "rgba(0,0,0,.84)"); pool.addColorStop(0.55, "rgba(0,0,0,.42)"); pool.addColorStop(1, "rgba(0,0,0,0)");
+    g.fillStyle = pool; g.fillRect(gz.x - r, gz.y - r, r * 2, r * 2);
+    g.globalCompositeOperation = "source-over";
+    const tint = g.createRadialGradient(gz.x, gz.y, 0, gz.x, gz.y, r);
+    tint.addColorStop(0, `rgba(${255},${Math.round(150 - 130 * lock)},${Math.round(30 - 25 * lock)},${0.17 + 0.16 * lock})`); tint.addColorStop(1, "rgba(255,120,20,0)");
+    g.fillStyle = tint; g.fillRect(gz.x - r, gz.y - r, r * 2, r * 2);
   }
 
-  // what it can see: only things in the light (and a fading memory of where the light just was)
-  const calm = 1 - 0.8 * sm((t - 3450) / 450);   // the sites sink back into the dark so the name can stand out
-  const seen = (x, y) => { let a = spot(Math.hypot(x - gz.x, y - gz.y), r); for (let k = 1; k <= 12; k++) { const p = gaze(t - k * 70); a = Math.max(a, spot(Math.hypot(x - p.x, y - p.y), radius(t - k * 70)) * Math.exp(-k * 0.3)); } return a * calm; };
-  g.textBaseline = "middle"; g.font = "11px Consolas, 'Courier New', monospace"; g.textAlign = "left";
+  // what lives in the dark: only seen where the light is, or just was
+  const seen = (x, y) => { let a = spot(Math.hypot(x - gz.x, y - gz.y), r); for (let j = 1; j <= 12; j++) { const p = gaze(t - j * 70); a = Math.max(a, spot(Math.hypot(x - p.x, y - p.y), radius(t - j * 70)) * Math.exp(-j * 0.3)); } return a * (1 - 0.85 * sm((t - 5900) / 300)); };
+  g.lineWidth = Math.max(1, U * 0.8);
+  for (const [i, j] of links) { const a = Math.min(seen(nodes[i].x, nodes[i].y), seen(nodes[j].x, nodes[j].y)); if (a < 0.03) continue; g.strokeStyle = `rgba(150,230,190,${a * 0.22})`; g.beginPath(); g.moveTo(nodes[i].x, nodes[i].y); g.lineTo(nodes[j].x, nodes[j].y); g.stroke(); }
   for (const n of nodes) {
     const a = seen(n.x, n.y); if (a < 0.02) continue;
     if (n.down) {
-      const fl = t > 2500 ? (0.55 + 0.45 * Math.sin(t * 0.045)) : 1, since = (t - 2600) / 700;
-      g.fillStyle = `rgba(255,59,59,${clamp(a * 1.4) * fl})`; g.beginPath(); g.arc(n.x, n.y, 4.5, 0, 6.2832); g.fill();
-      g.fillText("DOWN", n.x + 11, n.y + 1);
-      if (since > 0 && since < 1.4) { g.strokeStyle = `rgba(255,59,59,${.6 * (1 - since / 1.4)})`; g.lineWidth = 1.2; g.beginPath(); g.arc(n.x, n.y, 6 + since * 34, 0, 6.2832); g.stroke(); }
+      const fl = t > 5000 ? 0.55 + 0.45 * Math.sin(t * 0.05) : 1;
+      g.fillStyle = `rgba(255,50,50,${clamp(a * 1.5) * fl})`; g.beginPath(); g.arc(n.x, n.y, 6 * U, 0, 6.2832); g.fill();
+      for (let q = 0; q < 3; q++) { const s = (t - 5050 - q * 260) / 900; if (s > 0 && s < 1) { g.strokeStyle = `rgba(255,60,60,${0.7 * (1 - s)})`; g.lineWidth = 1.6 * U; g.beginPath(); g.arc(n.x, n.y, 8 * U + s * 90 * U, 0, 6.2832); g.stroke(); } }
     } else {
-      g.fillStyle = `rgba(110,210,150,${a * .85})`; g.beginPath(); g.arc(n.x, n.y, 2.6, 0, 6.2832); g.fill();
-      g.fillStyle = `rgba(200,190,160,${a * .55})`; g.fillText(n.label, n.x + 9, n.y + 1);
+      const tw = 0.75 + 0.25 * Math.sin(t * 0.004 * n.s + n.ph);
+      g.fillStyle = `rgba(150,235,195,${a * 0.9 * tw})`; g.beginPath(); g.arc(n.x, n.y, 2.4 * U * n.s, 0, 6.2832); g.fill();
+      g.fillStyle = `rgba(150,235,195,${a * 0.12})`; g.beginPath(); g.arc(n.x, n.y, 9 * U * n.s, 0, 6.2832); g.fill();
     }
   }
-  for (const m of motes) {                                                  // dust, only visible in the light
-    const x = (m.x + t * 0.012 * m.s) % W, y = m.y + Math.sin(t * 0.0013 + m.p) * 8, a = seen(x, y) * .5;
-    if (a > .02) { g.fillStyle = `rgba(255,220,160,${a})`; g.fillRect(x, y, 1.4, 1.4); }
+  if (t > 5030 && t < 5900) {                                           // the screen cracks around the dead one
+    const p = eo((t - 5030) / 420), f = 1 - sm((t - 5600) / 300);
+    g.save(); g.globalCompositeOperation = "lighter"; g.lineWidth = 1.4 * U;
+    for (const c of cracks) { const n = Math.max(1, Math.floor(p * (c.length - 1))); g.strokeStyle = `rgba(255,70,50,${0.65 * f})`; g.beginPath(); g.moveTo(c[0][0], c[0][1]); for (let i = 1; i <= n; i++) g.lineTo(c[i][0], c[i][1]); g.stroke(); }
+    g.restore();
   }
 
-  // the eyes: they open slowly, the pupils widen in the dark, then pinch when it finds the problem
-  const pupil = lerp(0.52, 0.2, lockK) * (1 + 0.1 * Math.sin(t * 0.004));
-  const look = { x: clamp((gz.x - W / 2) / 260, -1, 1), y: clamp((gz.y - EYE_Y) / 200, -.2, 1) };
-  const glow = 0.8 + 0.2 * Math.sin(t * 0.006);
-  eye(exL, EYE_Y, openness(t, 520) * (1 - 0.18 * lockK), look, pupil, glow);
-  eye(exR, EYE_Y, openness(t, 880) * (1 - 0.18 * lockK), look, pupil, glow);
+  // the watchers: small eyes open all over the dark, all together shut the instant it finds the problem
+  for (const s of swarm) smallEye(s, t);
 
-  // the name, lit letter by letter by its gaze
-  if (t > 3450) {
-    const name = "NOCTUA", sp = 15; g.font = "300 46px Georgia, 'Times New Roman', serif"; g.textAlign = "center";
-    const tw = name.split("").reduce((s, ch) => s + g.measureText(ch).width + sp, -sp); let x = W / 2 - tw / 2;
+  // the owl
+  const look = { x: clamp((gz.x - W / 2) / (W * 0.3), -1, 1), y: clamp((gz.y - EYE_Y) / (H * 0.3), -0.2, 1) };
+  const pupil = lerp(0.6, 0.17, lock) * (1 + 0.06 * Math.sin(t * 0.004)) * (t > 6300 ? 0.88 : 1), glow = 0.8 + 0.2 * Math.sin(t * 0.006);
+  for (const [ex, dly] of [[W / 2 - EYE_DX, 0], [W / 2 + EYE_DX, 320]]) {
+    const o = openness(t, dly) * (1 - 0.2 * lock);
+    if (o <= 0.01 && t > 1500 && t < 2000 + dly) { g.save(); g.globalCompositeOperation = "lighter"; const e = sm((t - 1500) / 500), q = g.createRadialGradient(ex, EYE_Y, 0, ex, EYE_Y, 28 * U); q.addColorStop(0, `rgba(255,150,30,${0.7 * e})`); q.addColorStop(1, "rgba(255,80,0,0)"); g.fillStyle = q; g.fillRect(ex - 30 * U, EYE_Y - 30 * U, 60 * U, 60 * U); g.restore(); }
+    eye(ex, EYE_Y, R, o, look, pupil, glow, lock);
+  }
+
+  // the name
+  if (t > 6400) {
+    const name = "NOCTUA", sp = 24 * U, fs = 78 * U; g.font = `300 ${fs}px Georgia, 'Times New Roman', serif`; g.textAlign = "center"; g.textBaseline = "middle";
+    const tw = [...name].reduce((s, ch) => s + g.measureText(ch).width + sp, -sp); let x = W / 2 - tw / 2;
     for (let i = 0; i < name.length; i++) {
-      const cw = g.measureText(name[i]).width, k = clamp((t - 3500 - i * 85) / 260), fl = k < 1 ? (Math.sin(t * 0.2 + i * 3) > -0.3 ? 1 : .25) : 1;
-      g.fillStyle = `rgba(242,236,222,${k * fl * .96})`; g.fillText(name[i], x + cw / 2, H * 0.8); x += cw + sp;
+      const cw = g.measureText(name[i]).width, kk = clamp((t - 6450 - i * 130) / 320), settled = kk >= 1;
+      const ch = settled && Math.random() > 0.03 ? name[i] : kk > 0 ? GLYPHS[(Math.random() * GLYPHS.length) | 0] : "";
+      if (ch) {
+        const glitch = settled && Math.random() < 0.025 ? 6 * U : 0;
+        if (glitch) { g.fillStyle = "rgba(255,40,40,.7)"; g.fillText(ch, x + cw / 2 - glitch, H * 0.8); g.fillStyle = "rgba(60,220,255,.5)"; g.fillText(ch, x + cw / 2 + glitch, H * 0.8); }
+        g.fillStyle = `rgba(244,238,224,${(settled ? 0.97 : 0.55) * Math.min(1, kk * 2)})`; g.fillText(ch, x + cw / 2, H * 0.8);
+      }
+      x += cw + sp;
     }
-    const tg = clamp((t - 4000) / 350);
-    if (tg > 0) { g.font = "14px 'Segoe UI', Tahoma, sans-serif"; g.fillStyle = `rgba(255,176,0,${tg * .8})`; g.direction = AR ? "rtl" : "ltr"; g.fillText(AR ? "بومة بتشوف في الضلمة" : "it sees in the dark", W / 2, H * 0.8 + 38); g.direction = "ltr"; }
+    const tg = clamp((t - 7000) / 400);
+    if (tg > 0) { g.font = `${20 * U}px 'Segoe UI', Tahoma, sans-serif`; g.fillStyle = `rgba(255,176,0,${tg * 0.85})`; g.direction = AR ? "rtl" : "ltr"; g.fillText(AR ? "بومة بتشوف في الضلمة" : "it sees in the dark", W / 2, H * 0.8 + 62 * U); g.direction = "ltr"; }
   }
-
-  // vignette and the fade to black
-  const v = g.createRadialGradient(W / 2, H / 2, H * .25, W / 2, H / 2, W * .65);
-  v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, "rgba(0,0,0,.8)");
-  g.fillStyle = v; g.fillRect(-4, -4, W + 8, H + 8);
   g.restore();
-  if (fade < 1) { g.fillStyle = `rgba(5,5,6,${1 - fade})`; g.fillRect(0, 0, W, H); }
+
+  // static burst at the moment it finds it
+  if ((t > 5030 && t < 5160) || (t > 5200 && t < 5250)) {
+    for (let i = 0; i < 46; i++) { const y = Math.random() * H, h = (2 + Math.random() * 16) * U; g.fillStyle = `rgba(${Math.random() > 0.5 ? "255,255,255" : "255,70,70"},${0.05 + Math.random() * 0.2})`; g.fillRect((Math.random() - 0.5) * 60 * U, y, W + 80, h); }
+  }
+  const v = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.25, W / 2, H / 2, Math.max(W, H) * 0.72);
+  v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, `rgba(0,0,0,${0.55 + 0.25 * pl})`); g.fillStyle = v; g.fillRect(0, 0, W, H);
+  if (lock > 0) { g.fillStyle = `rgba(110,0,0,${0.16 * lock})`; g.fillRect(0, 0, W, H); }
+  if (dk > 0.2) { g.globalAlpha = 0.07 * (dk > 0.9 ? 1 : dk); g.fillStyle = g.createPattern(grain[frame % 4], "repeat"); g.fillRect(0, 0, W, H); g.globalAlpha = 1; }
+  cv.style.opacity = String(1 - sm((t - REVEAL) / 700));
+}
+
+// ---- sound: a low drone, a heartbeat that speeds up, a sting when it finds it, a boom for the name ----
+let ac = null, master = null;
+function startAudio() {
+  if (MUTE || SEEK) return;
+  try {
+    ac = new (window.AudioContext || window.webkitAudioContext)(); const T = ac.currentTime;
+    master = ac.createGain(); master.gain.setValueAtTime(0, T); master.gain.linearRampToValueAtTime(0.3, T + 1.5);
+    master.gain.setValueAtTime(0.3, T + 7.4); master.gain.linearRampToValueAtTime(0, T + 8.1); master.connect(ac.destination);
+    const lp = ac.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 240; lp.connect(master);
+    for (const [f, v, ty] of [[41, 0.55, "sine"], [43.2, 0.45, "sine"], [82.4, 0.12, "triangle"], [123, 0.04, "sine"]]) { const o = ac.createOscillator(), gn = ac.createGain(); o.type = ty; o.frequency.value = f; gn.gain.value = v; o.connect(gn); gn.connect(lp); o.start(T); o.stop(T + 8.4); }
+    const env = (gn, at, vol, dur) => { gn.gain.setValueAtTime(0.0001, T + at); gn.gain.exponentialRampToValueAtTime(vol, T + at + 0.012); gn.gain.exponentialRampToValueAtTime(0.0001, T + at + dur); };
+    const thump = (at, vol) => { const o = ac.createOscillator(), gn = ac.createGain(); o.type = "sine"; o.frequency.setValueAtTime(75, T + at); o.frequency.exponentialRampToValueAtTime(34, T + at + 0.14); env(gn, at, vol, 0.26); o.connect(gn); gn.connect(master); o.start(T + at); o.stop(T + at + 0.3); };
+    for (const b of beats) { const s = 0.45 + 0.5 * sm((b - 1000) / 3500); thump(b / 1000, s); thump(b / 1000 + 0.17, s * 0.6); }
+    const noise = (at, dur, vol, freq) => { const n = Math.floor(ac.sampleRate * dur), buf = ac.createBuffer(1, n, ac.sampleRate), d = buf.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+      const s = ac.createBufferSource(); s.buffer = buf; const bp = ac.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = freq; const gn = ac.createGain(); env(gn, at, vol, dur); s.connect(bp); bp.connect(gn); gn.connect(master); s.start(T + at); };
+    noise(1.9, 1.1, 0.05, 520);
+    noise(5.03, 0.35, 0.2, 3200);
+    for (const f of [1109, 1175, 1568]) { const o = ac.createOscillator(), gn = ac.createGain(); o.frequency.value = f; env(gn, 5.03, 0.04, 0.9); o.connect(gn); gn.connect(master); o.start(T + 5.03); o.stop(T + 6); }
+    const o = ac.createOscillator(), gn = ac.createGain(); o.frequency.setValueAtTime(52, T + 6.4); o.frequency.exponentialRampToValueAtTime(30, T + 8); env(gn, 6.4, 0.9, 1.8); o.connect(gn); gn.connect(master); o.start(T + 6.4); o.stop(T + 8.3);
+  } catch { /* no audio device: the picture still works */ }
 }
 
 // ---- play ----
-window.__t = draw;                                                          // lets the tests draw any moment
-let done = false;
-const finish = () => { if (!done) { done = true; document.title = "done"; } };
-if (location.hash !== "#seek") {
-  const t0 = performance.now();
-  (function loop() { const t = performance.now() - t0; draw(t); if (t < DUR) requestAnimationFrame(loop); else finish(); })();
-  addEventListener("pointerdown", finish); addEventListener("keydown", finish);   // click or any key skips it
-} else draw(0);
+window.__t = draw;
+size(); addEventListener("resize", () => { size(); });
+if (new URLSearchParams(location.search).get("demo")) {               // tests only: a fake desktop behind the transparent canvas
+  const d = document.createElement("div"); d.id = "demo";
+  d.style.cssText = "background:linear-gradient(135deg,#1b4a7a,#2d7fb8 55%,#8ec5e8)";
+  d.innerHTML = '<div style="position:absolute;left:6%;top:10%;width:46%;height:56%;background:#f3f3f3;border-radius:8px;box-shadow:0 8px 30px #0006"><div style="height:30px;background:#2b2b2b;border-radius:8px 8px 0 0"></div><div style="padding:18px;font:16px Segoe UI;color:#222">Your open window<br><br>report.docx - Chrome - Terminal</div></div><div style="position:absolute;right:5%;top:30%;width:30%;height:45%;background:#1e1e1e;border-radius:8px;color:#9f9;font:14px Consolas;padding:14px">$ npm run build<br>done in 3.2s</div><div style="position:absolute;left:0;right:0;bottom:0;height:44px;background:#0d0d12cc"></div>';
+  document.body.prepend(d);
+}
+if (SEEK) draw(Number((location.hash.match(/t=(\d+)/) || [])[1] || 0));
+else {
+  let t0 = performance.now(), titled = false, over = false;
+  startAudio();
+  const skip = () => {
+    const t = performance.now() - t0; if (t >= REVEAL - 50) return;
+    t0 = performance.now() - REVEAL;
+    if (master) { try { master.gain.cancelScheduledValues(ac.currentTime); master.gain.setValueAtTime(master.gain.value, ac.currentTime); master.gain.linearRampToValueAtTime(0, ac.currentTime + 0.5); } catch { /* ignore */ } }
+  };
+  (function loop() {
+    const t = performance.now() - t0; draw(t);
+    if (!titled && t >= REVEAL) { titled = true; document.title = "reveal"; }                 // the app can show itself under the fading dark
+    if (t < DUR) requestAnimationFrame(loop); else if (!over) { over = true; document.title = "done"; }
+  })();
+  addEventListener("pointerdown", skip); addEventListener("keydown", skip);
+}
 </script></body></html>

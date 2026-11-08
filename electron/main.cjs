@@ -1,6 +1,6 @@
 // Noctua desktop shell. A real window, a tray icon, Windows notifications, and the monitor keeps
 // running in the background when the window is closed. All the checking code is the same as before.
-const { app, BrowserWindow, Tray, Menu, Notification, shell, nativeImage, dialog } = require("electron");
+const { app, BrowserWindow, Tray, Menu, Notification, shell, nativeImage, dialog, screen, ipcMain } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
 const { pathToFileURL } = require("node:url");
@@ -20,18 +20,25 @@ const prefsFile = () => path.join(app.getPath("userData"), "prefs.json");
 const readPrefs = () => { try { return JSON.parse(fs.readFileSync(prefsFile(), "utf8")); } catch { return {}; } };
 const writePrefs = (p) => { try { fs.writeFileSync(prefsFile(), JSON.stringify(p)); } catch { /* ignore */ } };
 
-// The intro: a short dark owl animation while Noctua starts. Click or press a key to skip it.
+// The intro: a full-screen, transparent, click-through-to-skip overlay. There is no window frame at all: the dark
+// swallows the real desktop and the owl's light shows parts of it again. It lasts about 8 seconds; click or press
+// any key to skip. The app window is shown at the "reveal" moment, while the dark is still lifting.
 function playIntro() {
   return new Promise((resolve) => {
-    const w = new BrowserWindow({ width: 760, height: 440, frame: false, resizable: false, movable: false, show: false, center: true, skipTaskbar: true,
-      alwaysOnTop: true, backgroundColor: "#050506", webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
-    let over = false;
-    const end = () => { if (over) return; over = true; clearTimeout(guard); try { w.destroy(); } catch { /* ignore */ } resolve(); };
-    const guard = setTimeout(end, 7000); // never let the intro hold the app up
-    w.once("ready-to-show", () => w.show());
-    w.webContents.on("page-title-updated", (_e, title) => { if (title === "done") end(); });
+    const d = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()), b = d.bounds;
+    const w = new BrowserWindow({ x: b.x, y: b.y, width: b.width, height: b.height, frame: false, transparent: true, hasShadow: false, resizable: false, movable: false,
+      minimizable: false, maximizable: false, fullscreenable: false, skipTaskbar: true, alwaysOnTop: true, show: false, backgroundColor: "#00000000",
+      webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false, autoplayPolicy: "no-user-gesture-required" } });
+    w.setAlwaysOnTop(true, "screen-saver");
+    let over = false, early = false;
+    const reveal = () => { if (!early) { early = true; resolve(); } };
+    const end = () => { if (over) return; over = true; clearTimeout(guard); try { w.destroy(); } catch { /* ignore */ } reveal(); };
+    const guard = setTimeout(end, 12000); // never let the intro hold the app up
+    const quiet = process.env.NOCTUA_QUIET === "1" || readPrefs().introSound === false;
+    w.once("ready-to-show", () => { w.show(); w.focus(); });
+    w.webContents.on("page-title-updated", (_e, title) => { if (title === "reveal") reveal(); else if (title === "done") end(); });
     w.on("closed", end);
-    w.loadFile(path.join(__dirname, "splash.html"), { query: { lang: ar() ? "ar" : "en" } }).catch(end);
+    w.loadFile(path.join(__dirname, "splash.html"), { query: { lang: ar() ? "ar" : "en", mute: quiet ? "1" : "0" } }).catch(end);
   });
 }
 
@@ -73,12 +80,12 @@ async function boot() {
   setupUpdates();
 }
 
-// ---- Updates: Noctua checks for a new version by itself, downloads it quietly, and installs it when you restart. ----
+// ---- Updates: Noctua checks at start-up (and every 6 hours). When there is a new version it asks, in its own window, before downloading. ----
 function setupUpdates() {
   if (!app.isPackaged || process.env.NOCTUA_NO_UPDATE) return; // only the installed program updates itself
   let autoUpdater;
   try { ({ autoUpdater } = require("electron-updater")); } catch { return; }
-  autoUpdater.autoDownload = true;
+  autoUpdater.autoDownload = false; // it asks first: the themed window below
   autoUpdater.autoInstallOnAppQuit = true;
   // Everything the updater does is written to updater.log, so a problem can be seen instead of guessed.
   const logFile = path.join(app.getPath("userData"), "updater.log");
@@ -91,18 +98,47 @@ function setupUpdates() {
   const set = (status, version) => { updateState = { status, version: version || updateState.version }; refreshTray(); };
   autoUpdater.on("checking-for-update", () => set("checking"));
   autoUpdater.on("update-not-available", () => { set("none"); tell(T("نوكتوا محدّث، دي أحدث نسخة.", "Noctua is up to date.")); manual = false; });
-  autoUpdater.on("update-available", (i) => { set("downloading", i.version); tell(T(`لقيت نسخة جديدة ${i.version}، بنزّلها دلوقتي.`, `Found version ${i.version}, downloading it now.`)); });
-  autoUpdater.on("error", (e) => { updateState.error = String(e && e.message || e).slice(0, 200); set("error"); tell(T("تعذّر فحص التحديث: ", "Could not check for updates: ") + updateState.error); manual = false; });
-  autoUpdater.on("update-downloaded", (i) => {
-    set("ready", i.version);
-    if (Notification.isSupported()) {
-      const n = new Notification({ title: "Noctua", body: T(`نسخة جديدة (${i.version}) جاهزة. دوس هنا عشان تتثبّت.`, `Version ${i.version} is ready. Click to install it.`), icon: path.join(ROOT, "build", "icon.png") });
-      n.on("click", installUpdate); n.show();
-    }
+  let dismissed = "", prompt = null, view = "available";
+  const sendState = (extra = {}) => { try { if (prompt && !prompt.isDestroyed()) prompt.webContents.send("noctua-state", { view, version: updateState.version, ...extra }); } catch { /* ignore */ } };
+  const openPrompt = (v) => {
+    view = v || view;
+    if (prompt && !prompt.isDestroyed()) { prompt.show(); prompt.focus(); sendState(); return; }
+    const d = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea, w = 560, h = 300;
+    prompt = new BrowserWindow({ width: w, height: h, x: Math.round(d.x + (d.width - w) / 2), y: Math.round(d.y + (d.height - h) / 2), frame: false, resizable: false, minimizable: false, maximizable: false,
+      alwaysOnTop: true, show: false, backgroundColor: "#000000", icon: path.join(ROOT, "build", "icon.png"),
+      webPreferences: { preload: path.join(__dirname, "update-preload.cjs"), sandbox: true, contextIsolation: true, nodeIntegration: false } });
+    prompt.once("ready-to-show", () => { prompt.show(); prompt.focus(); });
+    prompt.on("closed", () => { prompt = null; });
+    prompt.loadFile(path.join(__dirname, "update.html"), { query: { lang: ar() ? "ar" : "en", v: updateState.version || "", view } }).catch(() => {});
+  };
+  const closePrompt = () => { try { if (prompt && !prompt.isDestroyed()) prompt.close(); } catch { /* ignore */ } };
+  ipcMain.on("noctua-update", (e, name) => {
+    if (!prompt || e.sender !== prompt.webContents) return; // only our own update window may ask
+    if (name === "download") { view = "downloading"; set("downloading"); sendState({ percent: 0 }); log("INFO", "user accepted: downloading"); autoUpdater.downloadUpdate().catch((er) => { log("ERROR", er); view = "error"; set("error"); sendState({ error: String(er && er.message || er).slice(0, 160) }); }); }
+    else if (name === "install") { log("INFO", "user accepted: installing"); installUpdate(); }
+    else if (name === "later") { if (updateState.status === "available") dismissed = updateState.version; closePrompt(); }
+    else closePrompt();
   });
+  autoUpdater.on("download-progress", (pr) => sendState({ percent: Math.round(pr.percent || 0) }));
+  autoUpdater.on("update-available", (i) => {
+    set("available", i.version); log("INFO", `update available: ${i.version}`);
+    if (!manual && dismissed === i.version) return; // said "later" already: the tray still shows it, no nagging
+    if (hidden && !manual) { // started silently at login: do not pop a window, just tell
+      if (Notification.isSupported()) { const n = new Notification({ title: "Noctua", body: T(`البومة لقت نسخة جديدة ${i.version}. دوس هنا.`, `The owl found version ${i.version}. Click here.`), icon: path.join(ROOT, "build", "icon.png") }); n.on("click", () => openPrompt("available")); n.show(); }
+      return;
+    }
+    openPrompt("available"); manual = false;
+  });
+  autoUpdater.on("error", (e) => { updateState.error = String(e && e.message || e).slice(0, 200); set("error"); tell(T("تعذّر فحص التحديث: ", "Could not check for updates: ") + updateState.error); manual = false; if (view === "downloading") { view = "error"; sendState({ error: updateState.error }); } });
+  autoUpdater.on("update-downloaded", (i) => {
+    set("ready", i.version); view = "ready"; log("INFO", `downloaded: ${i.version}`);
+    if (prompt && !prompt.isDestroyed()) { sendState(); prompt.show(); prompt.focus(); return; }
+    openPrompt("ready");
+  });
+  global.__prompt = () => openPrompt(updateState.status === "ready" ? "ready" : "available");
   global.__check = (byHand) => { manual = byHand === true; return autoUpdater.checkForUpdates().catch((e) => { log("ERROR", e); set("error"); }); };
   global.__install = () => { quitting = true; try { if (server) server.close(); } catch { /* ignore */ } autoUpdater.quitAndInstall(false, true); };
-  setTimeout(global.__check, 15000);
+  setTimeout(global.__check, 1500); // check right at start-up
   setInterval(global.__check, 6 * 3600 * 1000);
 }
 const installUpdate = () => global.__install && global.__install();
@@ -136,7 +172,8 @@ function makeTray() {
   tray.setToolTip(T("نوكتوا: المراقبة شغالة", "Noctua: monitoring is running"));
   const updItem = () => {
     const v = updateState.version, st = updateState.status;
-    if (st === "ready") return { label: T(`تثبيت التحديث ${v} وإعادة التشغيل`, `Install update ${v} and restart`), click: installUpdate };
+    if (st === "ready") return { label: T(`تثبيت التحديث ${v} وإعادة التشغيل`, `Install update ${v} and restart`), click: () => global.__prompt && global.__prompt() };
+    if (st === "available") return { label: T(`في تحديث ${v}، دوس للتنزيل`, `Update ${v} available, click to download`), click: () => global.__prompt && global.__prompt() };
     if (st === "downloading") return { label: T(`بنزّل التحديث ${v}…`, `Downloading update ${v}…`), enabled: false };
     if (st === "checking") return { label: T("بدوّر على تحديث…", "Checking for updates…"), enabled: false };
     if (st === "error") return { label: T("تعذّر فحص التحديث، جرّب تاني", "Update check failed, try again"), click: () => global.__check && global.__check(true) };

@@ -1,0 +1,68 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Noctua</title>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#000;color:#ece8dc;font:15px/1.6 "Segoe UI",Tahoma,sans-serif;user-select:none;-webkit-app-region:drag}
+body{background:radial-gradient(380px circle at var(--mx,30%) var(--my,35%),rgba(255,176,0,.10),transparent 70%),#000;border:1px solid #2a2418;box-sizing:border-box}
+.box{display:flex;gap:26px;align-items:center;height:100%;padding:34px 38px}
+#eye{width:112px;height:112px;flex:none;filter:drop-shadow(0 0 22px rgba(255,176,0,.35))}
+.pupil{transform-box:fill-box;transform-origin:center;transition:transform .5s}
+.lid{transform-box:fill-box;transform-origin:center top;transform:scaleY(0);animation:blink 7s infinite}
+body[data-v=downloading] .pupil{transform:scale(.55,1.1)}
+body[data-v=downloading] .iris{animation:scan 1.2s ease-in-out infinite alternate}
+body[data-v=error] .iris{fill:url(#irisR)}body[data-v=error] .lid{animation:none;transform:scaleY(.4)}
+@keyframes blink{0%,93%,100%{transform:scaleY(0)}96%{transform:scaleY(1)}}
+@keyframes scan{from{opacity:.7}to{opacity:1}}
+.txt{flex:1;min-width:0}
+h1{margin:0 0 6px;font:400 26px/1.25 "Palatino Linotype",Sylfaen,Georgia,serif;color:#f4efe0}
+p{margin:0;color:#a39e90}
+.bar{height:3px;background:#1d1b16;margin:18px 0 6px;overflow:hidden;display:none}
+.bar i{display:block;height:100%;width:0;background:#ffb000;transition:width .3s}
+body[data-v=downloading] .bar{display:block}
+.btns{display:flex;gap:10px;margin-top:22px;flex-wrap:wrap;-webkit-app-region:no-drag}
+button{font:inherit;padding:9px 22px;border:1px solid #3a3528;background:transparent;color:#ece8dc;cursor:pointer;border-radius:0}
+button:hover{border-color:#ffb000;color:#ffb000}
+button.go{background:#ffb000;border-color:#ffb000;color:#000;font-weight:700}button.go:hover{background:#ffc83d;color:#000}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:reduce){.lid,.iris{animation:none!important}}
+</style></head>
+<body data-v="available">
+<div class="box">
+<svg id="eye" viewBox="0 0 120 120" aria-hidden="true"><defs>
+<radialGradient id="irisG" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="#ffe7a3"/><stop offset=".55" stop-color="#ffb000"/><stop offset="1" stop-color="#8a5a00"/></radialGradient>
+<radialGradient id="irisR" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="#ffb3a8"/><stop offset=".55" stop-color="#ff4b4b"/><stop offset="1" stop-color="#7a1b1b"/></radialGradient>
+<clipPath id="ball"><circle cx="60" cy="60" r="50"/></clipPath></defs>
+<circle cx="60" cy="60" r="55" fill="#050505" stroke="#3a3a3a" stroke-width="2"/><circle cx="60" cy="60" r="50" fill="#0d0d0d"/>
+<g clip-path="url(#ball)"><circle class="iris" cx="60" cy="60" r="34" fill="url(#irisG)"/>
+<g id="pg"><ellipse class="pupil" cx="60" cy="60" rx="14" ry="22" fill="#05040d"/><circle cx="52" cy="50" r="5" fill="#fff" opacity=".85"/></g>
+<rect class="lid" x="0" y="0" width="120" height="120" fill="#000"/></g></svg>
+<div class="txt">
+<h1 id="h"></h1><p id="p"></p>
+<div class="bar"><i id="fill"></i></div>
+<div class="btns"><button class="go" id="b1"></button><button id="b2"></button></div>
+</div></div>
+<script>
+const Q = new URLSearchParams(location.search), AR = Q.get("lang") === "ar", V = Q.get("v") || "";
+document.documentElement.dir = AR ? "rtl" : "ltr";
+const S = {
+  available: { h: AR ? "البومة لقت حاجة جديدة" : "The owl found something new", p: AR ? `نوكتوا ${V} جاهزة للتنزيل. ننزّلها؟` : `Noctua ${V} is ready to download. Shall we?`, b1: AR ? "نزّل التحديث" : "Download the update", b2: AR ? "بعدين" : "Later", a1: "download", a2: "later" },
+  downloading: { h: AR ? "بتنزل في الضلمة…" : "Coming through the dark…", p: AR ? "ممكن تكمّل شغلك، هنقولك لما تخلّص." : "Keep working. We will tell you when it lands.", b1: "", b2: AR ? "إخفاء" : "Hide", a2: "later" },
+  ready: { h: AR ? "النسخة الجديدة جاهزة" : "The new version has landed", p: AR ? "نعيد التشغيل ونثبّتها دلوقتي؟ المراقبة بتكمل بعد ثواني." : "Restart and install it now? Monitoring resumes in seconds.", b1: AR ? "ثبّت وأعد التشغيل" : "Install and restart", b2: AR ? "لما أقفل البرنامج" : "When I quit", a1: "install", a2: "close" },
+  error: { h: AR ? "التنزيل وقع في الضلمة" : "It got lost in the dark", p: "", b1: "", b2: AR ? "إغلاق" : "Close", a2: "close" },
+};
+let cur = "available", acts = {};
+function show(v, extra = {}) {
+  cur = v; const s = S[v]; document.body.dataset.v = v;
+  h.textContent = s.h; p.textContent = v === "error" ? (AR ? "تعذّر تنزيل التحديث: " : "The update could not download: ") + (extra.error || "") : s.p;
+  b1.hidden = !s.b1; b1.textContent = s.b1; b2.textContent = s.b2; acts = { b1: s.a1, b2: s.a2 };
+  if (extra.percent != null) fill.style.width = extra.percent + "%";
+}
+b1.onclick = () => window.noctua && window.noctua.act(acts.b1); b2.onclick = () => window.noctua && window.noctua.act(acts.b2);
+window.noctua && window.noctua.onState((st) => show(st.view, st));
+addEventListener("pointermove", (e) => {
+  document.body.style.setProperty("--mx", e.clientX + "px"); document.body.style.setProperty("--my", e.clientY + "px");
+  const r = document.getElementById("eye").getBoundingClientRect(), dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2), d = Math.hypot(dx, dy) || 1, k = Math.min(1, d / 260) * 10;
+  document.getElementById("pg").style.transform = `translate(${(dx / d * k).toFixed(1)}px,${(dy / d * k).toFixed(1)}px)`;
+});
+show(Q.get("view") || "available");
+window.__show = show;
+</script></body></html>
