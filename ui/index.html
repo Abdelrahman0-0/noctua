@@ -152,6 +152,24 @@ a{color:var(--ac)}pre{background:var(--inp);border:1px solid var(--bd);padding:8
 #live details.card>summary{cursor:pointer;color:var(--mut)}
 [hidden]{display:none!important}
 @media (prefers-reduced-motion:reduce){#eye .lid,#eye .iris,.bar i,.dot{animation:none!important}#eye .pupil{transition:none}}
+
+/* live */
+#liveBox{margin:0 0 22px}.lvh{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:6px 0 10px}
+.lvdot{width:10px;height:10px;border-radius:50%;background:var(--fail);animation:lvp 1.4s ease-in-out infinite}.lvh.paused .lvdot{animation:none;background:var(--skip)}
+@keyframes lvp{0%,100%{box-shadow:0 0 0 0 rgba(255,75,75,.6)}60%{box-shadow:0 0 0 8px rgba(255,75,75,0)}}
+.lvh b{letter-spacing:.2em;font-size:13px}.lvh button{padding:3px 12px;font-size:12px;margin-inline-start:auto}
+.lvk{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-end;margin:6px 0 4px}.lvk>div dt{color:var(--mut);font-size:11px}.lvk>div dd{margin:0;font-size:18px;font-weight:600;font-variant-numeric:tabular-nums;direction:ltr}.lvk .big dd{font-size:40px;line-height:1.1}
+.lvk dl{margin:0}.lvt{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}.lvt th{color:var(--mut);font-weight:600;text-align:start;padding:6px 8px;border-bottom:1px solid var(--bd2);white-space:nowrap}
+.lvt td{padding:5px 8px;border-top:1px solid #141414;vertical-align:middle;font-variant-numeric:tabular-nums}.lvt tr.r{cursor:pointer}.lvt tr.r:hover{background:#0d0d0d}.lvt tr.new{animation:flash 1.2s ease-out}
+@keyframes flash{from{background:rgba(255,176,0,.18)}to{background:transparent}}
+.lvt td.n{direction:ltr;text-align:start}.stk{display:flex;height:6px;min-width:140px;width:100%;direction:ltr;background:#151515}.stk i{display:block;height:100%}
+.ph0{background:#8d897d}.ph1{background:#b8a46a}.ph2{background:#c97a1a}.ph3{background:#ffb000}.ph4{background:#ece8dc}
+.lvd td{background:#050505;padding:12px 14px}.lvd .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}.lvd h4{margin:0 0 5px;color:var(--mut);font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.lvd pre{margin:0 0 8px;max-height:210px}.sc{font-weight:700}.sc.s2{color:var(--pass)}.sc.s3{color:#8fb7ff}.sc.s4{color:var(--warn)}.sc.s5,.sc.s0{color:var(--fail)}
+#reqList details.rq{border-top:1px solid #141414}#reqList summary{display:flex;gap:10px;padding:5px 2px;cursor:pointer;font-size:13px;list-style:none;align-items:baseline}#reqList summary::-webkit-details-marker{display:none}
+#reqList .u{flex:1;min-width:0;direction:ltr;text-align:start;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#reqList .src{font-size:10px;font-weight:700;padding:0 6px;border:1px solid currentColor}
+.src.api{color:var(--ac)}.src.site{color:#8fb7ff}.src.browser{color:#c9a7ff}#reqList pre{margin:4px 0 10px}
+@media(max-width:700px){.lvd .cols{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -185,7 +203,7 @@ a{color:var(--ac)}pre{background:var(--inp);border:1px solid var(--bd);padding:8
       <details class="more"><summary id="mAddT"></summary>
         <div class="grid">
           <div><label class="l" id="mNameL" for="mName"></label><input type="text" id="mName"></div>
-          <div><label class="l" id="mLightL" for="mLight"></label><input type="number" id="mLight" value="5" min="1"></div>
+          <div><label class="l" id="mLightL" for="mLight"></label><select id="mLight"><option value="5">5 s</option><option value="10">10 s</option><option value="15">15 s</option><option value="30">30 s</option><option value="60">1 min</option><option value="120">2 min</option><option value="300">5 min</option><option value="600">10 min</option><option value="1800">30 min</option><option value="3600">1 h</option></select></div>
           <div><label class="l" id="mDeepL" for="mDeep"></label><input type="number" id="mDeep" value="0" min="0"><p class="help" id="mDeepH"></p></div>
         </div>
       </details>
@@ -194,11 +212,12 @@ a{color:var(--ac)}pre{background:var(--inp);border:1px solid var(--bd);padding:8
 
     <div id="vSite" data-sub-panel="site" hidden>
       <div id="sitePick"></div>
+      <div id="liveBox"></div>
       <div id="siteBody"></div>
       <details class="more" id="setBox"><summary id="setT"></summary>
         <div class="grid">
           <div><label class="l" id="sNameL" for="sName"></label><input type="text" id="sName"></div>
-          <div><label class="l" id="sLightL" for="sLight"></label><input type="number" id="sLight" min="1"></div>
+          <div><label class="l" id="sLightL" for="sLight"></label><select id="sLight"><option value="5">5 s</option><option value="10">10 s</option><option value="15">15 s</option><option value="30">30 s</option><option value="60">1 min</option><option value="120">2 min</option><option value="300">5 min</option><option value="600">10 min</option><option value="1800">30 min</option><option value="3600">1 h</option></select></div>
           <div><label class="l" id="sSlowL" for="sSlow"></label><input type="number" id="sSlow" min="200"></div>
           <div><label class="l" id="sDeepL" for="sDeep"></label><input type="number" id="sDeep" min="0"></div>
           <div><label class="l" id="sKwL" for="sKw"></label><input type="text" id="sKw"></div>
@@ -289,6 +308,7 @@ a{color:var(--ac)}pre{background:var(--inp);border:1px solid var(--bd);padding:8
       </div>
     </div>
     <div id="results"></div>
+    <details class="card" id="reqCard" hidden open><summary id="reqT" style="cursor:pointer"></summary><div id="reqList"></div></details>
     <details class="card"><summary data-t="log" style="cursor:pointer"></summary><pre id="log"></pre></details>
   </section>
   </div>
@@ -391,6 +411,7 @@ function setRunning(v) {
   document.querySelectorAll("#formCard input,#formCard select").forEach((e) => { e.disabled = v; });
 }
 function reset() {
+  if ($("reqList")) { $("reqList").innerHTML = ""; reqN = 0; $("reqCard").hidden = true; }
   rows = []; counts = { PASS: 0, WARN: 0, FAIL: 0, SKIP: 0 }; done = false; curSec = null; lastSummary = null;
   $("results").innerHTML = ""; $("log").textContent = ""; $("status").textContent = ""; $("sum").hidden = true; $("attn").hidden = true; $("doneBtns").hidden = true; $("copyMsg").textContent = "";
   $("live").hidden = false; renderCounts();
@@ -446,6 +467,7 @@ function onEvent(ev) {
   else if (ev.type === "row") addRow(ev);
   else if (ev.type === "done") finish(ev.summary);
   else if (ev.type === "status") $("status").textContent = ev.text || "";
+  else if (ev.type === "req") addReq(ev.e);
   else if (ev.type === "log") { $("log").textContent += ev.line + "\n"; }
   else if (ev.type === "exit") {
     clearInterval(clockT); setRunning(false);
@@ -492,8 +514,8 @@ setInterval(() => fetch("/api/ping").catch(() => {}), 5000); fetch("/api/ping").
 
 // ---------- monitor ----------
 const MT = {
-  ar: { title: "المراقبة المستمرة", help: "نوكتوا يفحص مواقعك بجدول زمني ويبعتلك تنبيه لما موقع يقع. الفحص الخفيف: شغال؟ سريع؟ الشهادة؟ والعميق: اختبار نوكتوا الكامل بالمتصفح. نوكتوا بيفضل شغال في الخلفية لما تقفل النافذة (الأيقونة جنب الساعة)، ولو عاوز توقفه خالص اختار «خروج» من قايمة الأيقونة.", add: "إضافة موقع للمراقبة", url: "عنوان الموقع", name: "الاسم (اختياري)", light: "الفحص الخفيف كل (دقيقة)", deep: "الفحص العميق كل (دقيقة، 0 = إيقاف)", deepH: "ابدأ بـ 0 أو 60 أو أكتر. الفحص العميق بيستخدم المتصفح وطلبات AI حقيقية.", addBtn: "ابدأ المراقبة", al: "التنبيهات", alH: "تنبيه لما موقع يفشل فحصين ورا بعض، ولما يرجع. القيم محفوظة على جهازك فقط.", save: "حفظ", test: "جرّب تنبيه", saved: "اتحفظ", none: "ما فيش مواقع تحت المراقبة لسه.", up: "شغال", down: "واقع", wait: "في الانتظار", probe: "افحص الآن", deepNow: "عميق الآن", rm: "حذف", uptime: "التوفر", avg: "متوسط الرد", ssl: "الشهادة", days: "يوم", deepLast: "آخر فحص عميق", open: "افتح", running: "شغال دلوقتي…", off: "متوقف", pause: "إيقاف", resume: "تشغيل", sure: "تحذف المراقبة؟", lost: "الاتصال بنوكتوا انقطع. اقفل نوكتوا من أيقونة الساعة (خروج) وافتحه من جديد.", alertsOn: "التنبيهات مفعّلة", alertsOff: "مفيش تنبيهات مفعّلة" },
-  en: { title: "Continuous monitoring", help: "Noctua checks your sites on a schedule and alerts you when one goes down. Light check: up, fast, certificate. Deep check: the full Noctua browser test. Noctua keeps running in the background when you close the window (tray icon near the clock). To stop it completely, choose Quit from the tray menu.", add: "Add a site to monitor", url: "Site address", name: "Name (optional)", light: "Light check every (min)", deep: "Deep check every (min, 0 = off)", deepH: "Start with 0, or 60 and up. The deep check uses the browser and real AI calls.", addBtn: "Start monitoring", al: "Alerts", alH: "Alert when a site fails two checks in a row, and when it recovers. Values are saved on this computer only.", save: "Save", test: "Send test alert", saved: "Saved", none: "No sites monitored yet.", up: "UP", down: "DOWN", wait: "waiting", probe: "Check now", deepNow: "Deep now", rm: "Remove", uptime: "Uptime", avg: "Avg response", ssl: "Certificate", days: "days", deepLast: "Last deep check", open: "open", running: "running…", off: "paused", pause: "Pause", resume: "Resume", sure: "Remove this monitor?", lost: "Lost the connection to Noctua. Quit it from the tray icon and open it again.", alertsOn: "Alerts are on", alertsOff: "No alerts configured" },
+  ar: { title: "المراقبة المستمرة", help: "نوكتوا يفحص مواقعك بجدول زمني ويبعتلك تنبيه لما موقع يقع. الفحص الخفيف: شغال؟ سريع؟ الشهادة؟ والعميق: اختبار نوكتوا الكامل بالمتصفح. نوكتوا بيفضل شغال في الخلفية لما تقفل النافذة (الأيقونة جنب الساعة)، ولو عاوز توقفه خالص اختار «خروج» من قايمة الأيقونة.", add: "إضافة موقع للمراقبة", url: "عنوان الموقع", name: "الاسم (اختياري)", light: "الفحص الخفيف كل", deep: "الفحص العميق كل (دقيقة، 0 = إيقاف)", deepH: "ابدأ بـ 0 أو 60 أو أكتر. الفحص العميق بيستخدم المتصفح وطلبات AI حقيقية.", addBtn: "ابدأ المراقبة", al: "التنبيهات", alH: "تنبيه لما موقع يفشل فحصين ورا بعض، ولما يرجع. القيم محفوظة على جهازك فقط.", save: "حفظ", test: "جرّب تنبيه", saved: "اتحفظ", none: "ما فيش مواقع تحت المراقبة لسه.", up: "شغال", down: "واقع", wait: "في الانتظار", probe: "افحص الآن", deepNow: "عميق الآن", rm: "حذف", uptime: "التوفر", avg: "متوسط الرد", ssl: "الشهادة", days: "يوم", deepLast: "آخر فحص عميق", open: "افتح", running: "شغال دلوقتي…", off: "متوقف", pause: "إيقاف", resume: "تشغيل", sure: "تحذف المراقبة؟", lost: "الاتصال بنوكتوا انقطع. اقفل نوكتوا من أيقونة الساعة (خروج) وافتحه من جديد.", alertsOn: "التنبيهات مفعّلة", alertsOff: "مفيش تنبيهات مفعّلة" },
+  en: { title: "Continuous monitoring", help: "Noctua checks your sites on a schedule and alerts you when one goes down. Light check: up, fast, certificate. Deep check: the full Noctua browser test. Noctua keeps running in the background when you close the window (tray icon near the clock). To stop it completely, choose Quit from the tray menu.", add: "Add a site to monitor", url: "Site address", name: "Name (optional)", light: "Light check every", deep: "Deep check every (min, 0 = off)", deepH: "Start with 0, or 60 and up. The deep check uses the browser and real AI calls.", addBtn: "Start monitoring", al: "Alerts", alH: "Alert when a site fails two checks in a row, and when it recovers. Values are saved on this computer only.", save: "Save", test: "Send test alert", saved: "Saved", none: "No sites monitored yet.", up: "UP", down: "DOWN", wait: "waiting", probe: "Check now", deepNow: "Deep now", rm: "Remove", uptime: "Uptime", avg: "Avg response", ssl: "Certificate", days: "days", deepLast: "Last deep check", open: "open", running: "running…", off: "paused", pause: "Pause", resume: "Resume", sure: "Remove this monitor?", lost: "Lost the connection to Noctua. Quit it from the tray icon and open it again.", alertsOn: "Alerts are on", alertsOff: "No alerts configured" },
 };
 const mt = (k) => MT[lang][k] ?? k;
 let mState = { sites: [], alerts: {} }; window.mState = mState;
@@ -549,7 +571,7 @@ const VT = {
     contentT: "المحتوى", kwLine: "الكلمة المطلوبة", kwFound: "ظاهرة في الصفحة", kwMissing: "مش ظاهرة", kwNone: "ما اتحددتش", chgNone: "ما لاحظناش تغيّر في المحتوى لسه.", chgHelp: "بنقارن نص الصفحة وملفاتها في كل فحص.",
     evT: "أحداث الموقع", evNone: "مفيش أحداث لسه.", evDown: "وقع", evUp: "رجع بعد", evChanged: "المحتوى اتغيّر", evDeep: "الفحص العميق لقى أخطاء",
     recT: "آخر الفحوصات", cTime: "الوقت", cOk: "النتيجة", cNote: "ملاحظات", okT: "سليم", warnT: "تحذير", downT: "واقع",
-    setT: "إعدادات الموقع", sName: "الاسم", sLight: "الفحص كل (دقيقة)", sSlow: "أبطأ رد مقبول (ملّي ثانية)", sDeep: "الفحص العميق كل (دقيقة، 0 = إيقاف)", sKw: "كلمة لازم تظهر في الصفحة", sTok: "رمز الأدمن للفحص العميق (اتركه فاضي ليفضل زي ما هو)", sPaths: "صفحات إضافية للفحص (مسار في كل سطر)", sWatch: "نبّهني لو محتوى الصفحة اتغيّر", sSave: "حفظ الإعدادات", sSaved: "اتحفظ",
+    setT: "إعدادات الموقع", sName: "الاسم", sLight: "الفحص كل", sSlow: "أبطأ رد مقبول (ملّي ثانية)", sDeep: "الفحص العميق كل (دقيقة، 0 = إيقاف)", sKw: "كلمة لازم تظهر في الصفحة", sTok: "رمز الأدمن للفحص العميق (اتركه فاضي ليفضل زي ما هو)", sPaths: "صفحات إضافية للفحص (مسار في كل سطر)", sWatch: "نبّهني لو محتوى الصفحة اتغيّر", sSave: "حفظ الإعدادات", sSaved: "اتحفظ",
     netT: "الإنترنت على الجهاز ده", netOk: "الإنترنت شغال", netBad: "الإنترنت مقطوع", netWhy: "لو الإنترنت مقطوع، نوكتوا مش بيحسبه وقوع للموقع ومش بيبعت تنبيه. بنجرّب Google وCloudflare وMicrosoft كل دقيقة.", netCheck: "افحص الآن", netDns: "سرعة DNS", netTarget: "نقطة الاختبار", netLog: "آخر دقايق", netChecked: "آخر فحص",
     pcT: "الجهاز", pcCpu: "المعالج", pcRam: "الذاكرة", pcUp: "الجهاز شغال من", pcOs: "النظام", pcCores: "الأنوية",
     appT: "نوكتوا نفسه", aUp: "شغال من", aMem: "الذاكرة المستخدمة", aProbes: "فحوصات من ساعة التشغيل", aFailed: "منها فشلت", aLag: "تأخير الجدولة", aData: "حجم البيانات المحفوظة", aSites: "المواقع النشطة", aDeep: "فحوصات عميقة شغالة", aSched: "الجدولة", schedOn: "شغالة", schedOff: "واقفة",
@@ -572,7 +594,7 @@ const VT = {
     contentT: "Content", kwLine: "Required text", kwFound: "found on the page", kwMissing: "not on the page", kwNone: "not set", chgNone: "No content change noticed yet.", chgHelp: "We compare the page text and its files on every check.",
     evT: "Site events", evNone: "No events yet.", evDown: "went down", evUp: "came back after", evChanged: "content changed", evDeep: "deep check found failures",
     recT: "Recent checks", cTime: "Time", cOk: "Result", cNote: "Notes", okT: "OK", warnT: "Warning", downT: "Down",
-    setT: "Site settings", sName: "Name", sLight: "Check every (min)", sSlow: "Slowest acceptable response (ms)", sDeep: "Deep check every (min, 0 = off)", sKw: "Text that must appear on the page", sTok: "Admin token for the deep check (leave empty to keep it)", sPaths: "Extra pages to check (one path per line)", sWatch: "Alert me when the page content changes", sSave: "Save settings", sSaved: "Saved",
+    setT: "Site settings", sName: "Name", sLight: "Check every", sSlow: "Slowest acceptable response (ms)", sDeep: "Deep check every (min, 0 = off)", sKw: "Text that must appear on the page", sTok: "Admin token for the deep check (leave empty to keep it)", sPaths: "Extra pages to check (one path per line)", sWatch: "Alert me when the page content changes", sSave: "Save settings", sSaved: "Saved",
     netT: "Internet on this computer", netOk: "Internet is working", netBad: "Internet is down", netWhy: "While the internet is down Noctua doesn't count it as a site outage and sends no alert. It tries Google, Cloudflare and Microsoft every minute.", netCheck: "Check now", netDns: "DNS speed", netTarget: "Test point", netLog: "Last minutes", netChecked: "Last check",
     pcT: "This computer", pcCpu: "Processor", pcRam: "Memory", pcUp: "Up for", pcOs: "System", pcCores: "Cores",
     appT: "Noctua itself", aUp: "Running for", aMem: "Memory used", aProbes: "Checks since start", aFailed: "of them failed", aLag: "Scheduler delay", aData: "Saved data", aSites: "Active sites", aDeep: "Deep checks running", aSched: "Scheduler", schedOn: "running", schedOff: "stopped",
@@ -594,13 +616,14 @@ function renderSubnav() {
   document.querySelectorAll("[data-sub-panel]").forEach((p) => { p.hidden = p.dataset.subPanel !== sub; });
 }
 function showSub(n) {
+  if (n !== "site") { LIVE.id = null; $("liveBox").innerHTML = ""; }
   sub = n; try { localStorage.setItem("mm_sub", n); } catch { /* private mode */ }
   if (n === "site" && !curId && mState.sites.length) { curId = mState.sites[0].id; fillSettings(); }
   renderSubnav(); renderViews(); refreshView();
 }
 document.querySelectorAll("#subnav button").forEach((b) => { b.onclick = () => showSub(b.dataset.sub); });
 function openSite(id) { curId = id; detail = null; fillSettings(); showSub("site"); }
-function refreshView() { if (sub === "site") loadDetail(); else if (sub === "dev") loadSys(false); }
+function refreshView() { if (sub === "site") { loadDetail(); liveEnsure(); } else if (sub === "dev") loadSys(false); }
 async function loadDetail() {
   if (!curId) return;
   try { const r = await fetch("/api/monitor/detail?id=" + encodeURIComponent(curId)); if (r.status === 404) { curId = null; detail = null; renderSite(); return; } detail = await r.json(); renderSite(); } catch { /* keep the last view */ }
@@ -722,14 +745,15 @@ $("siteBody").onclick = async (e) => {
   } catch (err) { $("mErr").textContent = err.message; }
   setTimeout(() => { loadMon(); loadDetail(); }, 700);
 };
+function setEvery(sel, sec) { sec = String(Math.round(sec || 30)); if (![...sel.options].some((o) => o.value === sec)) { const o = document.createElement("option"); o.value = sec; o.textContent = sec + " s"; sel.add(o); } sel.value = sec; }
 function fillSettings() {
   const s = mState.sites.find((x) => x.id === curId); if (!s) return;
-  $("sName").value = s.name; $("sLight").value = s.lightMin; $("sSlow").value = s.slowMs || 3000; $("sDeep").value = s.deepMin || 0; $("sKw").value = s.keyword || ""; $("sTok").value = ""; $("sTok").placeholder = s.hasToken ? (lang === "ar" ? "محفوظ على الجهاز" : "saved on this computer") : ""; $("sPaths").value = (s.paths || []).join("\n"); $("sWatch").checked = !!s.watchContent; $("sMsg").textContent = "";
+  $("sName").value = s.name; setEvery($("sLight"), s.lightSec || s.lightMin * 60); $("sSlow").value = s.slowMs || 3000; $("sDeep").value = s.deepMin || 0; $("sKw").value = s.keyword || ""; $("sTok").value = ""; $("sTok").placeholder = s.hasToken ? (lang === "ar" ? "محفوظ على الجهاز" : "saved on this computer") : ""; $("sPaths").value = (s.paths || []).join("\n"); $("sWatch").checked = !!s.watchContent; $("sMsg").textContent = "";
 }
 $("sSave").onclick = async () => {
   const s = mState.sites.find((x) => x.id === curId); if (!s) return;
   try {
-    const body = { id: s.id, url: s.url, enabled: s.enabled, name: $("sName").value, lightMin: $("sLight").value, slowMs: $("sSlow").value, deepMin: $("sDeep").value, keyword: $("sKw").value, paths: $("sPaths").value, watchContent: $("sWatch").checked };
+    const body = { id: s.id, url: s.url, enabled: s.enabled, name: $("sName").value, lightSec: $("sLight").value, slowMs: $("sSlow").value, deepMin: $("sDeep").value, keyword: $("sKw").value, paths: $("sPaths").value, watchContent: $("sWatch").checked };
     if ($("sTok").value.trim()) body.token = $("sTok").value;
     await post("/api/monitor/site", body); $("sMsg").textContent = vt("sSaved"); $("sTok").value = ""; await loadMon(); fillSettings(); $("sMsg").textContent = vt("sSaved"); setTimeout(loadDetail, 1200);
   } catch (e) { $("sMsg").textContent = e.message; }
@@ -790,14 +814,90 @@ $("mList").onclick = async (e) => {
 };
 $("mAddBtn").onclick = async () => {
   $("mErr").textContent = "";
-  try { await post("/api/monitor/site", { url: val("mUrl"), name: val("mName"), lightMin: val("mLight"), deepMin: val("mDeep") }); $("mUrl").value = ""; $("mName").value = ""; loadMon(); }
+  try { await post("/api/monitor/site", { url: val("mUrl"), name: val("mName"), lightSec: val("mLight"), deepMin: val("mDeep") }); $("mUrl").value = ""; $("mName").value = ""; loadMon(); }
   catch (e) { $("mErr").textContent = e.message; }
 };
 $("aSave").onclick = async () => { try { await post("/api/monitor/alerts", { telegramToken: val("aTg"), telegramChatId: val("aChat"), webhookUrl: val("aHook") }); $("aTg").value = ""; $("aMsg").textContent = mt("saved"); loadMon(); } catch (e) { $("aMsg").textContent = e.message; } };
 $("aTest").onclick = async () => { try { const r = await post("/api/monitor/test-alert"); $("aMsg").textContent = (r.sent || []).join(", ") || mt("alertsOff"); } catch (e) { $("aMsg").textContent = e.message; } };
-{ const es2 = new EventSource("/api/monitor/events"); let tm; es2.onmessage = () => { clearTimeout(tm); tm = setTimeout(() => { loadMon(); refreshView(); }, 300); }; }
+{ const es2 = new EventSource("/api/monitor/events"); let tm; es2.onmessage = (m) => { let ev = null; try { ev = JSON.parse(m.data); } catch { /* ignore */ } if (ev && ev.type === "probe") { liveProbe(ev); if (sub === "site" && ev.id === curId) return; } clearTimeout(tm); tm = setTimeout(() => { loadMon(); refreshView(); }, 300); }; }
 setInterval(loadMon, 15000); document.addEventListener("visibilitychange", () => { if (!document.hidden) loadMon(); });
 $("langBtn").addEventListener("click", renderMon);
+
+
+// ---------- live: every request and every answer, as it happens ----------
+const LV = {
+  ar: { watching: "مراقبة مباشرة: فحص كل 3 ثواني طول ما الشاشة دي مفتوحة", ago: "من آخر فحص", pause: "إيقاف العرض", resume: "استئناف", empty: "مستني أول فحص…", time: "الوقت", status: "الحالة", total: "الإجمالي", ph: "المراحل", size: "الحجم", ip: "IP", notes: "ملاحظات", now: "دلوقتي", avg: "المتوسط", range: "أقل / أعلى", ok: "نجاح", req: "الطلب", res: "الرد", hops: "التحويلات", tls: "التشفير", prev: "بداية المحتوى", paths: "صفحات إضافية", legend: "DNS · اتصال · تشفير · انتظار · تحميل", stopAt: "وقف عند", fail: "ما ردّش", traffic: "كل طلب ورد حصل في الاختبار" },
+  en: { watching: "Live watch: probing every 3 seconds while this screen is open", ago: "since last probe", pause: "Pause", resume: "Resume", empty: "Waiting for the first probe…", time: "Time", status: "Status", total: "Total", ph: "Phases", size: "Size", ip: "IP", notes: "Notes", now: "Now", avg: "Average", range: "Min / max", ok: "Success", req: "Request", res: "Response", hops: "Redirects", tls: "Encryption", prev: "Start of the body", paths: "Extra pages", legend: "DNS · connect · TLS · wait · download", stopAt: "stopped at", fail: "no answer", traffic: "Every request and answer in the test" },
+};
+const lv = (k) => LV[lang][k] ?? k;
+const LIVE = { id: null, items: [], open: null, paused: false, last: 0, raf: 0 };
+async function liveEnsure() {
+  if (sub !== "site" || !curId || document.hidden) return;
+  const id = curId; post("/api/monitor/watch", { id }).catch(() => {});
+  if (LIVE.id !== id) {
+    LIVE.id = id; LIVE.items = []; LIVE.open = null; LIVE.last = 0; renderLive();
+    try { LIVE.items = await (await fetch("/api/monitor/traces?id=" + encodeURIComponent(id))).json(); LIVE.last = LIVE.items[0]?.rec?.t || 0; } catch { /* the first live probe fills it */ }
+    renderLive();
+  }
+}
+function liveProbe(ev) {
+  if (ev.id !== LIVE.id || !ev.rec) return; LIVE.items.unshift({ rec: ev.rec, trace: ev.trace, fresh: true }); if (LIVE.items.length > 120) LIVE.items.pop(); LIVE.last = ev.rec.t;
+  if (!LIVE.paused && !LIVE.raf) LIVE.raf = requestAnimationFrame(() => { LIVE.raf = 0; renderLive(); });
+}
+const stClass = (n) => "sc s" + (n ? String(n)[0] : 0);
+function liveChart(items) {
+  const a = items.slice(0, 60).reverse(); if (a.length < 2) return "";
+  const W = 900, H = 120, ok = a.filter((x) => x.rec.ok).map((x) => x.rec.ms), mx = Math.max(200, ...ok) * 1.15, step = W / (a.length - 1), y = (v) => H - 16 - (v / mx) * (H - 30);
+  let line = "", area = "", open = false;
+  a.forEach((x, i) => { if (!x.rec.ok) { open = false; return; } const px = (i * step).toFixed(1), py = y(x.rec.ms).toFixed(1); line += (open ? "L" : "M") + px + " " + py; open = true; });
+  const pts = a.map((x, i) => (x.rec.ok ? [i * step, y(x.rec.ms)] : null)).filter(Boolean); if (pts.length > 1) area = "M" + pts[0][0] + " " + (H - 16) + pts.map((q) => "L" + q[0].toFixed(1) + " " + q[1].toFixed(1)).join("") + "L" + pts[pts.length - 1][0] + " " + (H - 16) + "Z";
+  const bad = a.map((x, i) => (x.rec.ok ? "" : `<rect x="${(i * step - 2).toFixed(1)}" y="0" width="4" height="${H - 16}" fill="var(--fail)" opacity=".55"/>`)).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;direction:ltr"><path d="${area}" fill="rgba(255,176,0,.10)"/>${bad}<path d="${line}" fill="none" stroke="var(--ac)" stroke-width="1.6"/><text x="4" y="12" fill="var(--mut)" font-size="11">${Math.round(mx / 1.15)} ms</text><text x="4" y="${H - 3}" fill="var(--mut)" font-size="11">${fmtHMS(a[0].rec.t)}</text><text x="${W - 4}" y="${H - 3}" text-anchor="end" fill="var(--mut)" font-size="11">${fmtHMS(a[a.length - 1].rec.t)}</text></svg>`;
+}
+const fmtHMS = (t) => new Date(t).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+const hdrTxt = (o) => Object.entries(o || {}).map(([k, v]) => k + ": " + v).join("\n") || "-";
+function traceHtml(it) {
+  const tr = it.trace, r = it.rec; if (!tr) return `<div class="help">-</div>`;
+  const ph = r.ph ? `DNS ${r.ph.dns} · TCP ${r.ph.tcp} · TLS ${r.ph.tls} · wait ${r.ph.wait} · download ${r.ph.dl} ms` : "";
+  const hops = (tr.hops || []).map((h) => `${h.status} ${h.statusText || ""}  ${h.url}${h.loc ? "  →  " + h.loc : ""}  (${h.ms} ms)`).join("\n");
+  const res = tr.res ? `HTTP/${tr.res.httpVersion || "1.1"} ${tr.res.status} ${tr.res.statusText || ""}\n${hdrTxt(tr.res.headers)}` : `${lv("fail")}: ${tr.err || r.err || ""}${tr.stage ? "\n" + lv("stopAt") + ": " + tr.stage : ""}`;
+  const tls = tr.tls ? `${tr.tls.proto}  ${tr.tls.cipher || ""}  ${tr.tls.issuer || ""}${tr.tls.days != null ? "  (" + tr.tls.days + " d)" : ""}` : "";
+  const paths = (tr.paths || []).map((p) => `${p.ok ? "OK " : "ERR"} ${p.status || p.err || 0}  ${p.p}  ${p.ms} ms`).join("\n");
+  return `<div class="cols"><div><h4>${lv("req")}</h4><pre>${esc(tr.req.method + " " + tr.req.url + "\n" + hdrTxt(tr.req.headers))}</pre>${hops ? `<h4>${lv("hops")}</h4><pre>${esc(hops)}</pre>` : ""}${paths ? `<h4>${lv("paths")}</h4><pre>${esc(paths)}</pre>` : ""}</div>
+  <div><h4>${lv("res")}${tr.ip ? " · " + esc(tr.ip) : ""}</h4><pre>${esc(res)}</pre>${tls ? `<h4>${lv("tls")}</h4><pre>${esc(tls)}</pre>` : ""}${ph ? `<h4>${lv("ph")}</h4><pre>${esc(ph)}</pre>` : ""}${tr.res?.preview ? `<h4>${lv("prev")}</h4><pre>${esc(tr.res.preview)}</pre>` : ""}</div></div>`;
+}
+function renderLive() {
+  const box = $("liveBox"); if (!curId || sub !== "site") { box.innerHTML = ""; return; }
+  const it = LIVE.items; const last = it[0], recent = it.slice(0, 30), oks = recent.filter((x) => x.rec.ok).map((x) => x.rec.ms);
+  const avg = oks.length ? Math.round(oks.reduce((a, b) => a + b, 0) / oks.length) : null, succ = recent.length ? Math.round(recent.filter((x) => x.rec.ok).length / recent.length * 100) : null;
+  let h = `<div class="lvh ${LIVE.paused ? "paused" : ""}"><i class="lvdot"></i><b>LIVE</b><span class="help">${lv("watching")}</span><span class="help" dir="ltr" id="lvAgo"></span><button type="button" id="lvPause">${LIVE.paused ? lv("resume") : lv("pause")}</button></div>`;
+  if (!last) { box.innerHTML = h + `<div class="help" style="padding:10px 0">${lv("empty")}</div>`; return; }
+  h += `<dl class="lvk"><div class="big"><dt>${lv("now")}</dt><dd>${last.rec.status || last.rec.ok ? fmtMs(last.rec.ms) : lv("fail")}</dd></div><div><dt>${lv("status")}</dt><dd class="${stClass(last.rec.status)}">${last.rec.status || "ERR"}</dd></div><div><dt>${lv("avg")}</dt><dd>${avg == null ? "-" : fmtMs(avg)}</dd></div><div><dt>${lv("range")}</dt><dd>${oks.length ? fmtMs(Math.min(...oks)) + " / " + fmtMs(Math.max(...oks)) : "-"}</dd></div><div><dt>${lv("ok")}</dt><dd>${succ == null ? "-" : succ + "%"}</dd></div></dl>`;
+  h += liveChart(it);
+  h += `<table class="lvt"><thead><tr><th>${lv("time")}</th><th>${lv("status")}</th><th>${lv("total")}</th><th title="${lv("legend")}">${lv("ph")}</th><th>${lv("size")}</th><th>${lv("ip")}</th><th>${lv("notes")}</th></tr></thead><tbody>`;
+  for (const x of it.slice(0, 40)) {
+    const r = x.rec, n = x.trace?.n ?? r.t, p = r.ph, tot = p ? Math.max(1, p.dns + p.tcp + p.tls + p.wait + p.dl) : 1;
+    h += `<tr class="r ${x.fresh ? "new" : ""}" data-n="${n}"><td class="n">${fmtHMS(r.t)}</td><td class="${stClass(r.status)}">${r.status || "ERR"}</td><td class="n">${r.ok || r.ms ? fmtMs(r.ms) : "-"}</td><td>${p ? `<div class="stk">${[p.dns, p.tcp, p.tls, p.wait, p.dl].map((v, i) => `<i class="ph${i}" style="width:${(v / tot * 100).toFixed(1)}%"></i>`).join("")}</div>` : ""}</td><td class="n">${fmtB(r.size)}</td><td class="n">${esc(r.ip || "")}</td><td>${esc((r.notes || []).join(" · "))}</td></tr>`;
+    if (LIVE.open === n) h += `<tr class="lvd"><td colspan="7">${traceHtml(x)}</td></tr>`;
+    x.fresh = false;
+  }
+  box.innerHTML = h + "</tbody></table>";
+}
+$("liveBox").onclick = (e) => {
+  if (e.target.closest("#lvPause")) { LIVE.paused = !LIVE.paused; renderLive(); return; }
+  const tr = e.target.closest("tr.r"); if (!tr) return; const n = Number(tr.dataset.n); LIVE.open = LIVE.open === n ? null : n; renderLive();
+};
+setInterval(() => { const a = $("lvAgo"); if (a && LIVE.last) a.textContent = lv("ago") + " \u2066" + ((Date.now() - LIVE.last) / 1000).toFixed(1) + "s\u2069"; }, 200);
+
+// the test run: every request, live
+let reqN = 0;
+function addReq(e) {
+  $("reqCard").hidden = false; reqN++; $("reqT").textContent = lv("traffic") + " (" + reqN + ")";
+  let u = e.url; try { const a = new URL(e.url); u = a.pathname + a.search; } catch { /* keep */ }
+  const d = document.createElement("details"); d.className = "rq";
+  d.innerHTML = `<summary><span class="src ${e.src}">${e.src}</span><span>${esc(e.method)}</span><span class="${stClass(e.status)}">${e.status || "ERR"}</span><span class="u" title="${esc(e.url)}">${esc(u)}</span><span class="help" dir="ltr">${e.ms} ms</span></summary><pre>${esc(e.method + " " + e.url + "\n" + hdrTxt(e.reqHeaders) + (e.reqBody ? "\n\n" + e.reqBody : ""))}</pre><pre>${esc((e.status ? e.status + " " + (e.statusText || "") : "ERROR " + e.error) + "\n" + hdrTxt(e.resHeaders) + (e.resBody ? "\n\n" + e.resBody : ""))}</pre>`;
+  const list = $("reqList"); list.prepend(d); while (list.children.length > 250) list.lastChild.remove();
+}
 
 // ---------- the eye ----------
 (() => {

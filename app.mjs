@@ -139,6 +139,7 @@ export async function startApp({ port = 4777, open = true, autoExit = false, rep
       if (sub === "state") return send(200, { sites: monitor.list(), alerts: monitor.alerts(), incidents: monitor.incidents(), net: monitor.netBrief(), now: Date.now() });
       if (sub === "detail") { const d = monitor.detail(String(url.searchParams.get("id") || "")); return d ? send(200, d) : send(404, { error: "no such site" }); }
       if (sub === "system") return send(200, await monitor.system());
+      if (sub === "traces") return send(200, monitor.traces(String(url.searchParams.get("id") || "")));
       if (sub === "events") {
         res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
         res.write(": hi\n\n"); mclients.add(res); req.on("close", () => mclients.delete(res)); return;
@@ -152,6 +153,7 @@ export async function startApp({ port = 4777, open = true, autoExit = false, rep
       const b = await readBody(); if (!b) return send(400, { error: "bad request" });
       if (sub === "site") { const r = monitor.addOrUpdate(b); return send(r.error ? 400 : 200, r); }
       if (sub === "remove") return send(200, monitor.remove(String(b.id || "")));
+      if (sub === "watch") return send(200, monitor.watch(String(b.id || "")));
       if (sub === "probe") { monitor.probeNow(String(b.id || "")); return send(200, { ok: true }); }
       if (sub === "deep") { if (run.child) return send(409, { error: "A manual test is running. Try again when it ends." }); monitor.deepNow(String(b.id || "")); return send(200, { ok: true }); }
       if (sub === "alerts") { const r = monitor.saveAlerts(b); return send(r.error ? 400 : 200, r); }

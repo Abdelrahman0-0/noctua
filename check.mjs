@@ -12,6 +12,7 @@ import { runBench } from "./lib/bench.mjs";
 import { makePacer } from "./lib/pacer.mjs";
 import { sanity } from "./lib/quality.mjs";
 import { writeReport } from "./lib/report.mjs";
+import { traffic } from "./lib/traffic.mjs";
 
 export const HELP = `Noctua: sees what hides in the dark
 
@@ -53,6 +54,7 @@ export async function run(opts) {
     bench: { siteTimeoutMs: Number(opts.siteTimeout ?? 6000), gapMs: Number(opts.benchGap ?? 2200) },
   };
   ctx.pacer = makePacer(R, ctx.state, { limit: Number(opts.rateLimit ?? 30), windowMs: Number(opts.rateWindow ?? 600000), margin: Number(opts.rateMargin ?? 2), restWaitMs: Number(opts.restWait ?? 65000) });
+  traffic.reset();
   if (!opts.quiet) console.log(`\nChecking ${site}\n`);
   const reachable = await siteChecks(ctx);
   if (reachable) {
